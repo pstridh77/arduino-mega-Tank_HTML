@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Arduino LED-kontroll</title>
+  <title>Arduino kontrollpanel</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
-    <h1>Arduino LED</h1>
-    <p>Anslut till Arduino Mega via USB och styr den inbyggda LED:en.</p>
+    <h1>Arduino panel</h1>
+    <p>Anslut till Arduino Mega via USB och styr LED, LCD-text och mätvärden.</p>
 
     <div class="controls">
       <button id="connectButton" type="button">Anslut Arduino</button>
@@ -22,6 +22,38 @@
         </label>
       </div>
 
+      <section class="panel-section" aria-labelledby="lcdTitle">
+        <h2 id="lcdTitle">LCD-text</h2>
+        <label>
+          Rad 1
+          <input id="lcdLine1" type="text" maxlength="16" value="Tank status" disabled>
+        </label>
+        <label>
+          Rad 2
+          <input id="lcdLine2" type="text" maxlength="16" value="Redo" disabled>
+        </label>
+        <button id="sendTextButton" type="button" disabled>Visa text</button>
+      </section>
+
+      <section class="panel-section" aria-labelledby="measurementTitle">
+        <h2 id="measurementTitle">Mätvärde</h2>
+        <label>
+          Namn
+          <input id="measurementName" type="text" maxlength="16" value="Temperatur" disabled>
+        </label>
+        <div class="input-grid">
+          <label>
+            Värde
+            <input id="measurementValue" type="number" step="0.1" value="23.5" disabled>
+          </label>
+          <label>
+            Enhet
+            <input id="measurementUnit" type="text" maxlength="5" value="C" disabled>
+          </label>
+        </div>
+        <button id="sendMeasurementButton" type="button" disabled>Visa mätvärde</button>
+      </section>
+
       <p id="status" class="status">Inte ansluten.</p>
     </div>
   </main>
@@ -29,7 +61,25 @@
   <script>
     const connectButton = document.querySelector("#connectButton");
     const ledSwitch = document.querySelector("#ledSwitch");
+    const lcdLine1 = document.querySelector("#lcdLine1");
+    const lcdLine2 = document.querySelector("#lcdLine2");
+    const sendTextButton = document.querySelector("#sendTextButton");
+    const measurementName = document.querySelector("#measurementName");
+    const measurementValue = document.querySelector("#measurementValue");
+    const measurementUnit = document.querySelector("#measurementUnit");
+    const sendMeasurementButton = document.querySelector("#sendMeasurementButton");
     const statusText = document.querySelector("#status");
+
+    const serialControls = [
+      ledSwitch,
+      lcdLine1,
+      lcdLine2,
+      sendTextButton,
+      measurementName,
+      measurementValue,
+      measurementUnit,
+      sendMeasurementButton,
+    ];
 
     let port;
     let writer;
@@ -39,14 +89,27 @@
       statusText.classList.toggle("error", isError);
     }
 
-    async function sendLedState(isOn) {
+    async function sendCommand(command) {
       if (!writer) {
         return;
       }
 
-      const command = isOn ? "1" : "0";
-      await writer.write(new TextEncoder().encode(command));
+      await writer.write(new TextEncoder().encode(`${command}\n`));
+    }
+
+    async function sendLedState(isOn) {
+      await sendCommand(isOn ? "LED:1" : "LED:0");
       setStatus(isOn ? "LED tänd." : "LED släckt.");
+    }
+
+    async function sendLcdText() {
+      await sendCommand(`LCD:${lcdLine1.value}|${lcdLine2.value}`);
+      setStatus("Text skickad till LCD.");
+    }
+
+    async function sendMeasurement() {
+      await sendCommand(`MEAS:${measurementName.value}|${measurementValue.value}|${measurementUnit.value}`);
+      setStatus("Mätvärde skickat till LCD.");
     }
 
     connectButton.addEventListener("click", async () => {
@@ -59,7 +122,9 @@
         port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
         writer = port.writable.getWriter();
-        ledSwitch.disabled = false;
+        serialControls.forEach((control) => {
+          control.disabled = false;
+        });
         connectButton.disabled = true;
         setStatus("Ansluten. Vänta någon sekund efter anslutning om kortet startar om.");
       } catch (error) {
@@ -76,6 +141,30 @@
         setStatus(`Kunde inte skicka kommando: ${error.message}`, true);
       } finally {
         ledSwitch.disabled = false;
+      }
+    });
+
+    sendTextButton.addEventListener("click", async () => {
+      sendTextButton.disabled = true;
+
+      try {
+        await sendLcdText();
+      } catch (error) {
+        setStatus(`Kunde inte skicka text: ${error.message}`, true);
+      } finally {
+        sendTextButton.disabled = false;
+      }
+    });
+
+    sendMeasurementButton.addEventListener("click", async () => {
+      sendMeasurementButton.disabled = true;
+
+      try {
+        await sendMeasurement();
+      } catch (error) {
+        setStatus(`Kunde inte skicka mätvärde: ${error.message}`, true);
+      } finally {
+        sendMeasurementButton.disabled = false;
       }
     });
   </script>

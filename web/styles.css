@@ -28,7 +28,7 @@ body {
 }
 
 main {
-  width: min(100%, 440px);
+  width: min(100%, 520px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 92%, white);
@@ -49,6 +49,12 @@ p {
   color: var(--muted);
   line-height: 1.5;
   font-family: "Segoe UI", sans-serif;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .controls {
@@ -78,6 +84,29 @@ button:disabled {
   opacity: 0.55;
 }
 
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+input:disabled {
+  opacity: 0.6;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
@@ -87,6 +116,21 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fffdf8;
+}
+
+.panel-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(78px, 0.35fr);
+  gap: 12px;
 }
 
 .switch {
