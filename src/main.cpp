@@ -18,6 +18,7 @@ const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
 
 String serialLine;
 unsigned long lastLevelSampleTime;
+int desiredLevelMm = 250;
 
 float readMeasuredLevel() {
   const int sensorValue = analogRead(LEVEL_SENSOR_PIN);
@@ -28,8 +29,15 @@ float readMeasuredLevel() {
 }
 
 void reportMeasuredLevel() {
+  const float measuredLevel = readMeasuredLevel();
+  const float levelError = desiredLevelMm - measuredLevel;
+
   Serial.print("LEVEL:");
-  Serial.println(readMeasuredLevel(), 1);
+  Serial.print(measuredLevel, 1);
+  Serial.print('|');
+  Serial.print(desiredLevelMm);
+  Serial.print('|');
+  Serial.println(levelError, 1);
 }
 
 String fitLcdLine(String text) {
@@ -59,6 +67,20 @@ void showMeasurement(String name, String value, String unit) {
 
 void handleSerialLine(String line) {
   line.trim();
+
+  if (line.startsWith("SETPOINT:")) {
+    const String valueText = line.substring(9);
+    const int setpointValue = valueText.toInt();
+
+    if (valueText.length() > 0 && setpointValue >= 0 && setpointValue <= 500 && String(setpointValue) == valueText) {
+      desiredLevelMm = setpointValue;
+      Serial.println("SETPOINT:" + String(desiredLevelMm));
+      reportMeasuredLevel();
+    } else {
+      Serial.println("SETPOINT:ERROR");
+    }
+    return;
+  }
 
   if (line.startsWith("MOTOR:")) {
     const String valueText = line.substring(6);
@@ -110,13 +132,11 @@ void setup() {
   analogWrite(MOTOR_PWM_PIN, 0);
 
   pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
-  analogWrite(LCD_BACKLIGHT_PIN, 80);
+  analogWrite(LCD_BACKLIGHT_PIN, 100);
 
   lcd.begin(16, 2);
-  showLcdLines("Arduino Mega", "LCD redo");
-  delay(800);
-  showLcdLines("LCD test", "Kontrast?");
-
+  showLcdLines("FMTS", "Start Tank HTML");
+  
   Serial.begin(115200);
   Serial.println("READY");
   reportMeasuredLevel();

@@ -23,12 +23,37 @@
       </section>
 
       <section class="panel-section" aria-labelledby="levelTitle">
-        <div class="section-heading">
-          <h2 id="levelTitle">Uppmätt nivå</h2>
-          <div class="level-reading">
-            <output id="measuredLevel" aria-live="polite">--</output>
-            <span>mm</span>
+        <h2 id="levelTitle">Nivåreglering</h2>
+        <div class="level-values">
+          <div class="level-reading measured">
+            <span>Uppmätt</span>
+            <div><output id="measuredLevel" aria-live="polite">--</output> mm</div>
           </div>
+          <div class="level-reading desired">
+            <span>Önskad</span>
+            <div><output id="desiredLevelDisplay">--</output> mm</div>
+          </div>
+          <div class="level-reading error">
+            <span>Fel</span>
+            <div><output id="levelError">--</output> mm</div>
+          </div>
+        </div>
+        <label for="desiredLevel">Önskad nivå</label>
+        <div class="setpoint-control">
+          <input id="desiredLevel" type="number" min="0" max="500" step="1" value="250" disabled>
+          <span>mm</span>
+          <button id="sendSetpointButton" type="button" disabled>Ställ in</button>
+        </div>
+        <div class="chart-toolbar">
+          <div class="chart-legend" aria-label="Förklaring till grafen">
+            <span><i class="measured"></i>Uppmätt</span>
+            <span><i class="desired"></i>Önskad</span>
+            <span><i class="error"></i>Fel (högerskala)</span>
+          </div>
+          <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
+        </div>
+        <div class="level-chart">
+          <canvas id="levelChart" role="img" aria-label="Uppmätt nivå, önskad nivå och reglerfel under de senaste 60 sekunderna"></canvas>
         </div>
       </section>
 
@@ -73,6 +98,13 @@
     const motorPwm = document.querySelector("#motorPwm");
     const motorPwmValue = document.querySelector("#motorPwmValue");
     const measuredLevel = document.querySelector("#measuredLevel");
+    const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
+    const levelError = document.querySelector("#levelError");
+    const desiredLevel = document.querySelector("#desiredLevel");
+    const sendSetpointButton = document.querySelector("#sendSetpointButton");
+    const levelChart = document.querySelector("#levelChart");
+    const levelChartContext = levelChart.getContext("2d");
+    const toggleChartButton = document.querySelector("#toggleChartButton");
     const lcdLine1 = document.querySelector("#lcdLine1");
     const lcdLine2 = document.querySelector("#lcdLine2");
     const sendTextButton = document.querySelector("#sendTextButton");
@@ -84,6 +116,8 @@
 
     const serialControls = [
       motorPwm,
+      desiredLevel,
+      sendSetpointButton,
       lcdLine1,
       lcdLine2,
       sendTextButton,
@@ -95,6 +129,103 @@
 
     let port;
     let writer;
+    let chartPaused = false;
+    let pausedChartTime = 0;
+    const levelHistory = [];
+    const chartTimeSpanMs = 60000;
+    const chartMaxLevel = 500;
+
+    function drawLevelChart() {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = levelChart.clientWidth;
+      const height = levelChart.clientHeight;
+      const requiredWidth = Math.round(width * pixelRatio);
+      const requiredHeight = Math.round(height * pixelRatio);
+
+      if (levelChart.width !== requiredWidth || levelChart.height !== requiredHeight) {
+        levelChart.width = requiredWidth;
+        levelChart.height = requiredHeight;
+      }
+
+      levelChartContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      levelChartContext.clearRect(0, 0, width, height);
+
+      const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
+      const plotWidth = plot.right - plot.left;
+      const plotHeight = plot.bottom - plot.top;
+      const now = chartPaused ? pausedChartTime : performance.now();
+
+      levelChartContext.font = "11px Segoe UI, sans-serif";
+      levelChartContext.lineWidth = 1;
+      levelChartContext.textBaseline = "middle";
+
+      for (let level = 0; level <= chartMaxLevel; level += 100) {
+        const y = plot.bottom - (level / chartMaxLevel) * plotHeight;
+        levelChartContext.strokeStyle = "#ded5c3";
+        levelChartContext.beginPath();
+        levelChartContext.moveTo(plot.left, y);
+        levelChartContext.lineTo(plot.right, y);
+        levelChartContext.stroke();
+        levelChartContext.fillStyle = "#6b665b";
+        levelChartContext.textAlign = "right";
+        levelChartContext.fillText(String(level), plot.left - 7, y);
+        levelChartContext.textAlign = "left";
+        levelChartContext.fillText(String(level * 2 - 500), plot.right + 7, y);
+      }
+
+      for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
+        const x = plot.right - (secondsAgo / 60) * plotWidth;
+        levelChartContext.strokeStyle = "#ded5c3";
+        levelChartContext.beginPath();
+        levelChartContext.moveTo(x, plot.top);
+        levelChartContext.lineTo(x, plot.bottom);
+        levelChartContext.stroke();
+      }
+
+      levelChartContext.textBaseline = "alphabetic";
+      levelChartContext.fillStyle = "#6b665b";
+      levelChartContext.textAlign = "left";
+      levelChartContext.fillText("-60 s", plot.left, height - 5);
+      levelChartContext.textAlign = "right";
+      levelChartContext.fillText("nu", plot.right, height - 5);
+
+      if (levelHistory.length > 0) {
+        levelChartContext.save();
+        levelChartContext.beginPath();
+        levelChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
+        levelChartContext.clip();
+        levelChartContext.lineWidth = 2;
+        levelChartContext.lineJoin = "round";
+
+        function drawSeries(property, color, minimum, maximum) {
+          levelChartContext.strokeStyle = color;
+          levelChartContext.beginPath();
+
+          levelHistory.forEach((sample, index) => {
+            const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
+            const boundedValue = Math.min(maximum, Math.max(minimum, sample[property]));
+            const y = plot.bottom - ((boundedValue - minimum) / (maximum - minimum)) * plotHeight;
+
+            if (index === 0) {
+              levelChartContext.moveTo(x, y);
+            } else {
+              levelChartContext.lineTo(x, y);
+            }
+          });
+
+          levelChartContext.stroke();
+        }
+
+        drawSeries("measured", "#24745f", 0, chartMaxLevel);
+        drawSeries("desired", "#2463a0", 0, chartMaxLevel);
+        drawSeries("error", "#b4492f", -chartMaxLevel, chartMaxLevel);
+        levelChartContext.restore();
+      }
+
+      requestAnimationFrame(drawLevelChart);
+    }
+
+    drawLevelChart();
 
     function setStatus(message, isError = false) {
       statusText.textContent = message;
@@ -110,14 +241,44 @@
     }
 
     function handleSerialLine(line) {
+      if (line === "READY") {
+        sendCommand("LCD:FMTS|Ready").catch((error) => {
+          setStatus(`Kunde inte bekräfta webbanslutningen: ${error.message}`, true);
+        });
+        return;
+      }
+
       if (!line.startsWith("LEVEL:")) {
         return;
       }
 
-      const level = Number(line.substring(6));
-      if (Number.isFinite(level)) {
-        measuredLevel.value = level.toFixed(1);
+      const values = line.substring(6).split("|").map(Number);
+      if (values.length === 1 && Number.isFinite(values[0])) {
+        const measured = values[0];
+        const desired = Number(desiredLevel.value);
+        const error = desired - measured;
+
+        updateLevelValues(measured, desired, error);
+      } else if (values.length === 3 && values.every(Number.isFinite)) {
+        updateLevelValues(values[0], values[1], values[2]);
       }
+    }
+
+    function updateLevelValues(measured, desired, error) {
+        measuredLevel.value = measured.toFixed(1);
+        desiredLevelDisplay.value = desired.toFixed(1);
+        levelError.value = error.toFixed(1);
+
+        if (chartPaused) {
+          return;
+        }
+
+        const now = performance.now();
+        levelHistory.push({ time: now, measured, desired, error });
+
+        while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
+          levelHistory.shift();
+        }
     }
 
     async function readSerialMessages() {
@@ -147,6 +308,16 @@
       setStatus(`Motor PWM: ${motorPwm.value}.`);
     }
 
+    async function sendDesiredLevel() {
+      if (!desiredLevel.reportValidity()) {
+        return;
+      }
+
+      desiredLevelDisplay.value = Number(desiredLevel.value).toFixed(1);
+      await sendCommand(`SETPOINT:${desiredLevel.value}`);
+      setStatus(`Önskad nivå skickad: ${desiredLevel.value} mm.`);
+    }
+
     async function sendLcdText() {
       await sendCommand(`LCD:${lcdLine1.value}|${lcdLine2.value}`);
       setStatus("Text skickad till LCD.");
@@ -170,6 +341,12 @@
         readSerialMessages().catch((error) => {
           setStatus(`Kunde inte läsa mätvärdet: ${error.message}`, true);
         });
+        await sendCommand("LCD:FMTS|Ready");
+        setTimeout(() => {
+          sendCommand("LCD:FMTS|Ready").catch((error) => {
+            setStatus(`Kunde inte uppdatera LCD-status: ${error.message}`, true);
+          });
+        }, 1500);
         serialControls.forEach((control) => {
           control.disabled = false;
         });
@@ -182,6 +359,31 @@
 
     motorPwm.addEventListener("input", () => {
       motorPwmValue.value = motorPwm.value;
+    });
+
+    toggleChartButton.addEventListener("click", () => {
+      chartPaused = !chartPaused;
+      toggleChartButton.setAttribute("aria-pressed", String(chartPaused));
+
+      if (chartPaused) {
+        pausedChartTime = performance.now();
+        toggleChartButton.textContent = "Återuppta graf";
+      } else {
+        levelHistory.length = 0;
+        toggleChartButton.textContent = "Pausa graf";
+      }
+    });
+
+    sendSetpointButton.addEventListener("click", async () => {
+      sendSetpointButton.disabled = true;
+
+      try {
+        await sendDesiredLevel();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in önskad nivå: ${error.message}`, true);
+      } finally {
+        sendSetpointButton.disabled = false;
+      }
     });
 
     motorPwm.addEventListener("change", async () => {

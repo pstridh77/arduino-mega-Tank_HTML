@@ -142,22 +142,122 @@ input:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.level-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .level-reading {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  color: var(--accent-dark);
   font-variant-numeric: tabular-nums;
 }
 
-.level-reading output {
-  font-size: 1.5rem;
+.level-reading > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
-.level-reading span {
-  color: var(--muted);
+.level-reading div {
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.level-reading output {
+  font-size: 1.15rem;
+}
+
+.level-reading.measured div {
+  color: #24745f;
+}
+
+.level-reading.desired div {
+  color: #2463a0;
+}
+
+.level-reading.error div {
+  color: #b4492f;
+}
+
+.setpoint-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.setpoint-control button {
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.setpoint-control span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chart-legend i {
+  width: 16px;
+  height: 3px;
+  background: currentColor;
+}
+
+.chart-legend .measured {
+  color: #24745f;
+}
+
+.chart-legend .desired {
+  color: #2463a0;
+}
+
+.chart-legend .error {
+  color: #b4492f;
+}
+
+.chart-toggle {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 11px;
+  font-size: 0.75rem;
+}
+
+.chart-toggle[aria-pressed="true"] {
+  background: #b4492f;
+}
+
+.level-chart {
+  width: 100%;
+  height: 220px;
+}
+
+.level-chart canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 input[type="range"] {
