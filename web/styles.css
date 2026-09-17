@@ -127,6 +127,31 @@ input:disabled {
   background: #fffdf8;
 }
 
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-heading output {
+  min-width: 3ch;
+  color: var(--accent-dark);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]:disabled {
+  cursor: not-allowed;
+}
+
 .input-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(78px, 0.35fr);

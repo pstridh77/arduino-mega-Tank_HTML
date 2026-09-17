@@ -9,18 +9,18 @@
 <body>
   <main>
     <h1>Arduino panel</h1>
-    <p>Anslut till Arduino Mega via USB och styr LED, LCD-text och mätvärden.</p>
+    <p>Anslut till Arduino Mega via USB och styr motor, LCD-text och mätvärden.</p>
 
     <div class="controls">
       <button id="connectButton" type="button">Anslut Arduino</button>
 
-      <div class="switch-row">
-        <label for="ledSwitch">Inbyggd LED</label>
-        <label class="switch" aria-label="Styr inbyggd LED">
-          <input id="ledSwitch" type="checkbox" disabled>
-          <span class="slider"></span>
-        </label>
-      </div>
+      <section class="panel-section" aria-labelledby="motorTitle">
+        <div class="section-heading">
+          <h2 id="motorTitle">Motorhastighet</h2>
+          <output id="motorPwmValue" for="motorPwm">0</output>
+        </div>
+        <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
+      </section>
 
       <section class="panel-section" aria-labelledby="lcdTitle">
         <h2 id="lcdTitle">LCD-text</h2>
@@ -60,7 +60,8 @@
 
   <script>
     const connectButton = document.querySelector("#connectButton");
-    const ledSwitch = document.querySelector("#ledSwitch");
+    const motorPwm = document.querySelector("#motorPwm");
+    const motorPwmValue = document.querySelector("#motorPwmValue");
     const lcdLine1 = document.querySelector("#lcdLine1");
     const lcdLine2 = document.querySelector("#lcdLine2");
     const sendTextButton = document.querySelector("#sendTextButton");
@@ -71,7 +72,7 @@
     const statusText = document.querySelector("#status");
 
     const serialControls = [
-      ledSwitch,
+      motorPwm,
       lcdLine1,
       lcdLine2,
       sendTextButton,
@@ -97,9 +98,9 @@
       await writer.write(new TextEncoder().encode(`${command}\n`));
     }
 
-    async function sendLedState(isOn) {
-      await sendCommand(isOn ? "LED:1" : "LED:0");
-      setStatus(isOn ? "LED tänd." : "LED släckt.");
+    async function sendMotorPwm() {
+      await sendCommand(`MOTOR:${motorPwm.value}`);
+      setStatus(`Motor PWM: ${motorPwm.value}.`);
     }
 
     async function sendLcdText() {
@@ -132,15 +133,15 @@
       }
     });
 
-    ledSwitch.addEventListener("change", async () => {
-      ledSwitch.disabled = true;
+    motorPwm.addEventListener("input", () => {
+      motorPwmValue.value = motorPwm.value;
+    });
 
+    motorPwm.addEventListener("change", async () => {
       try {
-        await sendLedState(ledSwitch.checked);
+        await sendMotorPwm();
       } catch (error) {
-        setStatus(`Kunde inte skicka kommando: ${error.message}`, true);
-      } finally {
-        ledSwitch.disabled = false;
+        setStatus(`Kunde inte styra motorn: ${error.message}`, true);
       }
     });
 

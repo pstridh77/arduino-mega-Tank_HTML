@@ -4,6 +4,8 @@
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 const byte LCD_BACKLIGHT_PIN = 10;
+const byte MOTOR_DIRECTION_PIN = 13;
+const byte MOTOR_PWM_PIN = 11;
 
 String serialLine;
 
@@ -35,15 +37,16 @@ void showMeasurement(String name, String value, String unit) {
 void handleSerialLine(String line) {
   line.trim();
 
-  if (line == "1" || line == "LED:1") {
-    digitalWrite(LED_BUILTIN, HIGH);
-    Serial.println("LED:ON");
-    return;
-  }
+  if (line.startsWith("MOTOR:")) {
+    const String valueText = line.substring(6);
+    const int pwmValue = valueText.toInt();
 
-  if (line == "0" || line == "LED:0") {
-    digitalWrite(LED_BUILTIN, LOW);
-    Serial.println("LED:OFF");
+    if (valueText.length() > 0 && pwmValue >= 0 && pwmValue <= 255 && String(pwmValue) == valueText) {
+      analogWrite(MOTOR_PWM_PIN, pwmValue);
+      Serial.println("MOTOR:" + String(pwmValue));
+    } else {
+      Serial.println("MOTOR:ERROR");
+    }
     return;
   }
 
@@ -77,8 +80,11 @@ void handleSerialLine(String line) {
 }
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+  pinMode(MOTOR_DIRECTION_PIN, OUTPUT);
+  digitalWrite(MOTOR_DIRECTION_PIN, LOW);
+
+  pinMode(MOTOR_PWM_PIN, OUTPUT);
+  analogWrite(MOTOR_PWM_PIN, 0);
 
   pinMode(LCD_BACKLIGHT_PIN, OUTPUT);
   analogWrite(LCD_BACKLIGHT_PIN, 80);
