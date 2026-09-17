@@ -142,6 +142,24 @@ input:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.level-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--accent-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.level-reading output {
+  font-size: 1.5rem;
+}
+
+.level-reading span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 input[type="range"] {
   width: 100%;
   accent-color: var(--accent);

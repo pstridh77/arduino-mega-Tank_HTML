@@ -6,8 +6,31 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 const byte LCD_BACKLIGHT_PIN = 10;
 const byte MOTOR_DIRECTION_PIN = 13;
 const byte MOTOR_PWM_PIN = 11;
+const byte LEVEL_SENSOR_PIN = A4;
+
+const float ADC_MAX_VALUE = 1023.0F;
+const float ADC_REFERENCE_VOLTAGE = 5.0F;
+const float SENSOR_RANGE_MM = 500.0F;
+const float SENSOR_FULL_SCALE_VOLTAGE = 5.0F;
+const float MAX_LEVEL_MM = 500.0F;
+const float MIN_LEVEL_MM = 60.0F;
+const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
 
 String serialLine;
+unsigned long lastLevelSampleTime;
+
+float readMeasuredLevel() {
+  const int sensorValue = analogRead(LEVEL_SENSOR_PIN);
+  const float sensorVoltage = sensorValue * ADC_REFERENCE_VOLTAGE / ADC_MAX_VALUE;
+  const float sensorDistance = sensorVoltage * SENSOR_RANGE_MM / SENSOR_FULL_SCALE_VOLTAGE;
+
+  return MAX_LEVEL_MM + MIN_LEVEL_MM - sensorDistance;
+}
+
+void reportMeasuredLevel() {
+  Serial.print("LEVEL:");
+  Serial.println(readMeasuredLevel(), 1);
+}
 
 String fitLcdLine(String text) {
   text.trim();
@@ -96,6 +119,7 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println("READY");
+  reportMeasuredLevel();
 }
 
 void loop() {
@@ -113,5 +137,11 @@ void loop() {
         Serial.println("ERROR:LINE_TOO_LONG");
       }
     }
+  }
+
+  const unsigned long currentTime = millis();
+  if (currentTime - lastLevelSampleTime >= LEVEL_SAMPLE_INTERVAL_MS) {
+    lastLevelSampleTime = currentTime;
+    reportMeasuredLevel();
   }
 }

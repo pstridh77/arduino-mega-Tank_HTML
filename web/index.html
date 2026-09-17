@@ -22,6 +22,16 @@
         <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
       </section>
 
+      <section class="panel-section" aria-labelledby="levelTitle">
+        <div class="section-heading">
+          <h2 id="levelTitle">Uppmätt nivå</h2>
+          <div class="level-reading">
+            <output id="measuredLevel" aria-live="polite">--</output>
+            <span>mm</span>
+          </div>
+        </div>
+      </section>
+
       <section class="panel-section" aria-labelledby="lcdTitle">
         <h2 id="lcdTitle">LCD-text</h2>
         <label>
@@ -62,6 +72,7 @@
     const connectButton = document.querySelector("#connectButton");
     const motorPwm = document.querySelector("#motorPwm");
     const motorPwmValue = document.querySelector("#motorPwmValue");
+    const measuredLevel = document.querySelector("#measuredLevel");
     const lcdLine1 = document.querySelector("#lcdLine1");
     const lcdLine2 = document.querySelector("#lcdLine2");
     const sendTextButton = document.querySelector("#sendTextButton");
@@ -98,6 +109,39 @@
       await writer.write(new TextEncoder().encode(`${command}\n`));
     }
 
+    function handleSerialLine(line) {
+      if (!line.startsWith("LEVEL:")) {
+        return;
+      }
+
+      const level = Number(line.substring(6));
+      if (Number.isFinite(level)) {
+        measuredLevel.value = level.toFixed(1);
+      }
+    }
+
+    async function readSerialMessages() {
+      const reader = port.readable.getReader();
+      const decoder = new TextDecoder();
+      let receivedText = "";
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          receivedText += decoder.decode(value, { stream: true });
+          const lines = receivedText.split("\n");
+          receivedText = lines.pop();
+          lines.forEach((line) => handleSerialLine(line.trim()));
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+
     async function sendMotorPwm() {
       await sendCommand(`MOTOR:${motorPwm.value}`);
       setStatus(`Motor PWM: ${motorPwm.value}.`);
@@ -123,6 +167,9 @@
         port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
         writer = port.writable.getWriter();
+        readSerialMessages().catch((error) => {
+          setStatus(`Kunde inte läsa mätvärdet: ${error.message}`, true);
+        });
         serialControls.forEach((control) => {
           control.disabled = false;
         });
