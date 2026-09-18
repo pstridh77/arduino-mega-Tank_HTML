@@ -36,6 +36,19 @@
           <option value="p">P-regulator</option>
           <option value="pi">PI-regulator</option>
         </select>
+        <div id="onOffSettings" class="mode-settings" hidden>
+          <label for="onOffHysteresis">Hysteres från önskad nivå</label>
+          <div class="setting-control">
+            <input id="onOffHysteresis" type="number" min="0" max="250" step="1" value="10" disabled>
+            <span>mm</span>
+          </div>
+          <label for="onOffPwm">Pumpens effekt</label>
+          <div class="setting-control">
+            <input id="onOffPwm" type="number" min="0" max="255" step="1" value="180" disabled>
+            <span>PWM</span>
+          </div>
+          <button id="sendOnOffSettingsButton" type="button" disabled>Ställ in On/Off</button>
+        </div>
       </section>
 
       <section class="panel-section" aria-labelledby="levelTitle">
@@ -84,6 +97,10 @@
     const potentiometerValue = document.querySelector("#potentiometerValue");
     const potentiometerPwm = document.querySelector("#potentiometerPwm");
     const controlMode = document.querySelector("#controlMode");
+    const onOffSettings = document.querySelector("#onOffSettings");
+    const onOffHysteresis = document.querySelector("#onOffHysteresis");
+    const onOffPwm = document.querySelector("#onOffPwm");
+    const sendOnOffSettingsButton = document.querySelector("#sendOnOffSettingsButton");
     const measuredLevel = document.querySelector("#measuredLevel");
     const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
     const levelError = document.querySelector("#levelError");
@@ -97,6 +114,9 @@
     const serialControls = [
       motorPwm,
       controlMode,
+      onOffHysteresis,
+      onOffPwm,
+      sendOnOffSettingsButton,
       desiredLevel,
       sendSetpointButton,
     ];
@@ -313,6 +333,19 @@
       setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
     }
 
+    function updateOnOffSettingsVisibility() {
+      onOffSettings.hidden = controlMode.value !== "on-off";
+    }
+
+    async function sendOnOffSettings() {
+      if (!onOffHysteresis.reportValidity() || !onOffPwm.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`ONOFF:${onOffHysteresis.value}|${onOffPwm.value}`);
+      setStatus("On/Off-inställningar skickade.");
+    }
+
     connectButton.addEventListener("click", async () => {
       if (!("serial" in navigator)) {
         setStatus("Web Serial stöds i Chrome eller Edge.", true);
@@ -347,12 +380,27 @@
     });
 
     controlMode.addEventListener("change", async () => {
+      updateOnOffSettingsVisibility();
       try {
         await sendControlMode();
       } catch (error) {
         setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
       }
     });
+
+    sendOnOffSettingsButton.addEventListener("click", async () => {
+      sendOnOffSettingsButton.disabled = true;
+
+      try {
+        await sendOnOffSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in On/Off-regulatorn: ${error.message}`, true);
+      } finally {
+        sendOnOffSettingsButton.disabled = false;
+      }
+    });
+
+    updateOnOffSettingsVisibility();
 
     toggleChartButton.addEventListener("click", () => {
       chartPaused = !chartPaused;

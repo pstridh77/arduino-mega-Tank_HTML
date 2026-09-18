@@ -15,11 +15,17 @@ const float SENSOR_RANGE_MM = 500.0F;
 const float SENSOR_FULL_SCALE_VOLTAGE = 5.0F;
 const float MAX_LEVEL_MM = 500.0F;
 const float MIN_LEVEL_MM = 60.0F;
+const float MOTOR_SHUTDOWN_LEVEL_MM = 550.0F;
 const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
+const int DEFAULT_ON_OFF_HYSTERESIS_MM = 10;
+const int DEFAULT_ON_OFF_PWM = 180;
 
 String serialLine;
 unsigned long lastLevelSampleTime;
 int desiredLevelMm = 250;
+int onOffHysteresisMm = DEFAULT_ON_OFF_HYSTERESIS_MM;
+int onOffPwm = DEFAULT_ON_OFF_PWM;
+bool onOffPumpRunning = false;
 
 enum RegulationMode {
   MODE_MANUAL,
@@ -50,15 +56,36 @@ void reportMeasuredLevel() {
   Serial.println(levelError, 1);
 }
 
+int writeMotorPwm(int requestedPwm) {
+  const int safeMotorPwm = readMeasuredLevel() > MOTOR_SHUTDOWN_LEVEL_MM ? 0 : requestedPwm;
+
+  analogWrite(MOTOR_PWM_PIN, safeMotorPwm);
+  return safeMotorPwm;
+}
+
 void updateManualMotorPwm() {
   const int potentiometerValue = analogRead(MOTOR_POTENTIOMETER_PIN);
-  const int motorPwm = potentiometerValue * 255L / ADC_MAX_VALUE;
+  const int requestedMotorPwm = potentiometerValue * 255L / ADC_MAX_VALUE;
+  const int motorPwm = writeMotorPwm(requestedMotorPwm);
 
-  analogWrite(MOTOR_PWM_PIN, motorPwm);
   Serial.print("POT:");
   Serial.print(potentiometerValue);
   Serial.print('|');
   Serial.println(motorPwm);
+}
+
+void updateOnOffMotorPwm(float measuredLevel) {
+  const float lowerLimit = desiredLevelMm - onOffHysteresisMm;
+  const float upperLimit = desiredLevelMm + onOffHysteresisMm;
+
+  if (measuredLevel < lowerLimit) {
+    onOffPumpRunning = true;
+  } else if (measuredLevel >= upperLimit) {
+    onOffPumpRunning = false;
+  }
+
+  const int requestedMotorPwm = onOffPumpRunning ? onOffPwm : 0;
+  writeMotorPwm(requestedMotorPwm);
 }
 
 String fitLcdLine(String text) {
@@ -123,13 +150,35 @@ void handleSerialLine(String line) {
     return;
   }
 
+  if (line.startsWith("ONOFF:")) {
+    const String payload = line.substring(6);
+    const int separatorIndex = payload.indexOf('|');
+    const String hysteresisText = separatorIndex >= 0 ? payload.substring(0, separatorIndex) : "";
+    const String pwmText = separatorIndex >= 0 ? payload.substring(separatorIndex + 1) : "";
+    const int hysteresis = hysteresisText.toInt();
+    const int pwm = pwmText.toInt();
+
+    if (hysteresisText.length() > 0 && pwmText.length() > 0
+        && hysteresis >= 0 && hysteresis <= 250
+        && pwm >= 0 && pwm <= 255
+        && String(hysteresis) == hysteresisText
+        && String(pwm) == pwmText) {
+      onOffHysteresisMm = hysteresis;
+      onOffPwm = pwm;
+      Serial.println("ONOFF:" + String(onOffHysteresisMm) + "|" + String(onOffPwm));
+    } else {
+      Serial.println("ONOFF:ERROR");
+    }
+    return;
+  }
+
   if (line.startsWith("MOTOR:")) {
     const String valueText = line.substring(6);
     const int pwmValue = valueText.toInt();
 
     if (valueText.length() > 0 && pwmValue >= 0 && pwmValue <= 255 && String(pwmValue) == valueText) {
-      analogWrite(MOTOR_PWM_PIN, pwmValue);
-      Serial.println("MOTOR:" + String(pwmValue));
+      const int safeMotorPwm = writeMotorPwm(pwmValue);
+      Serial.println("MOTOR:" + String(safeMotorPwm));
     } else {
       Serial.println("MOTOR:ERROR");
     }
@@ -203,10 +252,20 @@ void loop() {
   const unsigned long currentTime = millis();
   if (currentTime - lastLevelSampleTime >= LEVEL_SAMPLE_INTERVAL_MS) {
     lastLevelSampleTime = currentTime;
-    reportMeasuredLevel();
+    const float measuredLevel = readMeasuredLevel();
+    const float levelError = desiredLevelMm - measuredLevel;
+
+    Serial.print("LEVEL:");
+    Serial.print(measuredLevel, 1);
+    Serial.print('|');
+    Serial.print(desiredLevelMm);
+    Serial.print('|');
+    Serial.println(levelError, 1);
 
     if (regulationMode == MODE_MANUAL) {
       updateManualMotorPwm();
+    } else if (regulationMode == MODE_ON_OFF) {
+      updateOnOffMotorPwm(measuredLevel);
     }
   }
 }

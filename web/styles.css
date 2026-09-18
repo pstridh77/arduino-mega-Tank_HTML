@@ -175,6 +175,29 @@ input:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.mode-settings {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.setting-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-control span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.mode-settings button {
+  min-height: 42px;
+}
+
 .level-values {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
