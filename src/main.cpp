@@ -36,6 +36,20 @@ enum RegulationMode {
 
 RegulationMode regulationMode = MODE_MANUAL;
 
+String regulationModeLabel() {
+  switch (regulationMode) {
+    case MODE_ON_OFF:
+      return "On/Off";
+    case MODE_P:
+      return "P";
+    case MODE_PI:
+      return "PI";
+    case MODE_MANUAL:
+    default:
+      return "Manuell";
+  }
+}
+
 float readMeasuredLevel() {
   const int sensorValue = analogRead(LEVEL_SENSOR_PIN);
   const float sensorVoltage = sensorValue * ADC_REFERENCE_VOLTAGE / ADC_MAX_VALUE;
@@ -113,6 +127,10 @@ void showMeasurement(String name, String value, String unit) {
   showLcdLines(name, value + " " + unit);
 }
 
+void showRegulationStatus(float levelError) {
+  showLcdLines("Reg: " + regulationModeLabel(), "Fel: " + String(levelError, 1) + " mm");
+}
+
 void handleSerialLine(String line) {
   line.trim();
 
@@ -132,6 +150,7 @@ void handleSerialLine(String line) {
       return;
     }
 
+    showRegulationStatus(desiredLevelMm - readMeasuredLevel());
     Serial.println("MODE:" + mode);
     return;
   }
@@ -261,6 +280,7 @@ void loop() {
     Serial.print(desiredLevelMm);
     Serial.print('|');
     Serial.println(levelError, 1);
+    showRegulationStatus(levelError);
 
     if (regulationMode == MODE_MANUAL) {
       updateManualMotorPwm();
