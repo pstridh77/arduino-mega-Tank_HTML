@@ -16,12 +16,16 @@ const float SENSOR_FULL_SCALE_VOLTAGE = 5.0F;
 const float MAX_LEVEL_MM = 500.0F;
 const float MIN_LEVEL_MM = 60.0F;
 const float MOTOR_SHUTDOWN_LEVEL_MM = 550.0F;
+const int MOTOR_MAGNETIZATION_PWM = 55;
 const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
 const int DEFAULT_ON_OFF_HYSTERESIS_MM = 10;
 const int DEFAULT_ON_OFF_PWM = 180;
 const float DEFAULT_P_GAIN = 1.0F;
 const float MIN_P_GAIN = 0.0F;
 const float MAX_P_GAIN = 10.0F;
+const float DEFAULT_PI_INTEGRAL_GAIN = 0.1F;
+const float MIN_PI_INTEGRAL_GAIN = 0.0F;
+const float MAX_PI_INTEGRAL_GAIN = 2.0F;
 
 String serialLine;
 unsigned long lastLevelSampleTime;
@@ -29,6 +33,8 @@ int desiredLevelMm = 250;
 int onOffHysteresisMm = DEFAULT_ON_OFF_HYSTERESIS_MM;
 int onOffPwm = DEFAULT_ON_OFF_PWM;
 float pGain = DEFAULT_P_GAIN;
+float piIntegralGain = DEFAULT_PI_INTEGRAL_GAIN;
+float piIntegral = 0.0F;
 bool onOffPumpRunning = false;
 
 enum RegulationMode {
@@ -113,9 +119,31 @@ void updateOnOffMotorPwm(float measuredLevel) {
 
 void updateProportionalMotorPwm(float measuredLevel) {
   const float levelError = desiredLevelMm - measuredLevel;
-  const int requestedMotorPwm = levelError > 0.0F ? constrain(static_cast<int>(levelError * pGain), 0, 255) : 0;
+  const int requestedMotorPwm = constrain(
+    static_cast<int>(MOTOR_MAGNETIZATION_PWM + levelError * pGain),
+    0,
+    255);
 
   writeMotorPwm(requestedMotorPwm);
+}
+
+void resetPiIntegral() {
+  piIntegral = 0.0F;
+}
+
+void updatePiMotorPwm(float measuredLevel, float elapsedSeconds) {
+  const float levelError = desiredLevelMm - measuredLevel;
+
+  if (piIntegralGain > 0.0F) {
+    piIntegral += levelError * elapsedSeconds;
+    const float maximumIntegral = 255.0F / piIntegralGain;
+    piIntegral = constrain(piIntegral, -maximumIntegral, maximumIntegral);
+  }
+
+  const float requestedMotorPwm = MOTOR_MAGNETIZATION_PWM
+    + pGain * levelError
+    + piIntegralGain * piIntegral;
+  writeMotorPwm(constrain(static_cast<int>(requestedMotorPwm), 0, 255));
 }
 
 String fitLcdLine(String text) {
@@ -168,6 +196,7 @@ void handleSerialLine(String line) {
       return;
     }
 
+  resetPiIntegral();
     writeMotorPwm(0);
     showRegulationStatus(desiredLevelMm - readMeasuredLevel());
     Serial.println("MODE:" + mode);
@@ -219,6 +248,20 @@ void handleSerialLine(String line) {
       Serial.println("PGAIN:" + String(pGain, 1));
     } else {
       Serial.println("PGAIN:ERROR");
+    }
+    return;
+  }
+
+  if (line.startsWith("PIGAIN:")) {
+    const String gainText = line.substring(7);
+    const float gain = gainText.toFloat();
+
+    if (gainText.length() > 0 && gain >= MIN_PI_INTEGRAL_GAIN && gain <= MAX_PI_INTEGRAL_GAIN) {
+      piIntegralGain = gain;
+      resetPiIntegral();
+      Serial.println("PIGAIN:" + String(piIntegralGain, 2));
+    } else {
+      Serial.println("PIGAIN:ERROR");
     }
     return;
   }
@@ -302,6 +345,7 @@ void loop() {
 
   const unsigned long currentTime = millis();
   if (currentTime - lastLevelSampleTime >= LEVEL_SAMPLE_INTERVAL_MS) {
+    const float elapsedSeconds = (currentTime - lastLevelSampleTime) / 1000.0F;
     lastLevelSampleTime = currentTime;
     const float measuredLevel = readMeasuredLevel();
     const float levelError = desiredLevelMm - measuredLevel;
@@ -320,6 +364,8 @@ void loop() {
       updateOnOffMotorPwm(measuredLevel);
     } else if (regulationMode == MODE_P) {
       updateProportionalMotorPwm(measuredLevel);
+    } else if (regulationMode == MODE_PI) {
+      updatePiMotorPwm(measuredLevel, elapsedSeconds);
     }
   }
 }

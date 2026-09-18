@@ -58,6 +58,14 @@
           </div>
           <button id="sendPSettingsButton" type="button" disabled>Ställ in P-regulator</button>
         </div>
+        <div id="piSettings" class="mode-settings" hidden>
+          <label for="piIntegralGain">Integralförstärkning Ki</label>
+          <div class="setting-control">
+            <input id="piIntegralGain" type="number" min="0" max="2" step="0.05" value="0.1" disabled>
+            <span>Ki</span>
+          </div>
+          <button id="sendPiSettingsButton" type="button" disabled>Ställ in PI-regulator</button>
+        </div>
       </section>
 
       <section class="panel-section" aria-labelledby="levelTitle">
@@ -113,6 +121,9 @@
     const pSettings = document.querySelector("#pSettings");
     const pGain = document.querySelector("#pGain");
     const sendPSettingsButton = document.querySelector("#sendPSettingsButton");
+    const piSettings = document.querySelector("#piSettings");
+    const piIntegralGain = document.querySelector("#piIntegralGain");
+    const sendPiSettingsButton = document.querySelector("#sendPiSettingsButton");
     const measuredLevel = document.querySelector("#measuredLevel");
     const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
     const levelError = document.querySelector("#levelError");
@@ -131,6 +142,8 @@
       sendOnOffSettingsButton,
       pGain,
       sendPSettingsButton,
+      piIntegralGain,
+      sendPiSettingsButton,
       desiredLevel,
       sendSetpointButton,
     ];
@@ -373,6 +386,19 @@
       setStatus(`P-regulatorns K är ${Number(pGain.value).toFixed(1)}.`);
     }
 
+    function updatePiSettingsVisibility() {
+      piSettings.hidden = controlMode.value !== "pi";
+    }
+
+    async function sendPiSettings() {
+      if (!piIntegralGain.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`PIGAIN:${piIntegralGain.value}`);
+      setStatus(`PI-regulatorns Ki är ${Number(piIntegralGain.value).toFixed(2)}.`);
+    }
+
     connectButton.addEventListener("click", async () => {
       if (!("serial" in navigator)) {
         setStatus("Web Serial stöds i Chrome eller Edge.", true);
@@ -409,10 +435,23 @@
     controlMode.addEventListener("change", async () => {
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
+      updatePiSettingsVisibility();
       try {
         await sendControlMode();
       } catch (error) {
         setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+      }
+    });
+
+    sendPiSettingsButton.addEventListener("click", async () => {
+      sendPiSettingsButton.disabled = true;
+
+      try {
+        await sendPiSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in PI-regulatorn: ${error.message}`, true);
+      } finally {
+        sendPiSettingsButton.disabled = false;
       }
     });
 
@@ -442,6 +481,7 @@
 
     updateOnOffSettingsVisibility();
     updatePSettingsVisibility();
+    updatePiSettingsVisibility();
 
     toggleChartButton.addEventListener("click", () => {
       chartPaused = !chartPaused;
