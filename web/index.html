@@ -50,6 +50,14 @@
           </div>
           <button id="sendOnOffSettingsButton" type="button" disabled>Ställ in On/Off</button>
         </div>
+        <div id="pSettings" class="mode-settings" hidden>
+          <label for="pGain">Förstärkning K</label>
+          <div class="setting-control">
+            <input id="pGain" type="number" min="0" max="10" step="0.2" value="1.0" disabled>
+            <span>K</span>
+          </div>
+          <button id="sendPSettingsButton" type="button" disabled>Ställ in P-regulator</button>
+        </div>
       </section>
 
       <section class="panel-section" aria-labelledby="levelTitle">
@@ -102,6 +110,9 @@
     const onOffHysteresis = document.querySelector("#onOffHysteresis");
     const onOffPwm = document.querySelector("#onOffPwm");
     const sendOnOffSettingsButton = document.querySelector("#sendOnOffSettingsButton");
+    const pSettings = document.querySelector("#pSettings");
+    const pGain = document.querySelector("#pGain");
+    const sendPSettingsButton = document.querySelector("#sendPSettingsButton");
     const measuredLevel = document.querySelector("#measuredLevel");
     const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
     const levelError = document.querySelector("#levelError");
@@ -118,6 +129,8 @@
       onOffHysteresis,
       onOffPwm,
       sendOnOffSettingsButton,
+      pGain,
+      sendPSettingsButton,
       desiredLevel,
       sendSetpointButton,
     ];
@@ -347,6 +360,19 @@
       setStatus("On/Off-inställningar skickade.");
     }
 
+    function updatePSettingsVisibility() {
+      pSettings.hidden = controlMode.value !== "p";
+    }
+
+    async function sendPSettings() {
+      if (!pGain.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`PGAIN:${pGain.value}`);
+      setStatus(`P-regulatorns K är ${Number(pGain.value).toFixed(1)}.`);
+    }
+
     connectButton.addEventListener("click", async () => {
       if (!("serial" in navigator)) {
         setStatus("Web Serial stöds i Chrome eller Edge.", true);
@@ -382,10 +408,23 @@
 
     controlMode.addEventListener("change", async () => {
       updateOnOffSettingsVisibility();
+      updatePSettingsVisibility();
       try {
         await sendControlMode();
       } catch (error) {
         setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+      }
+    });
+
+    sendPSettingsButton.addEventListener("click", async () => {
+      sendPSettingsButton.disabled = true;
+
+      try {
+        await sendPSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in P-regulatorn: ${error.message}`, true);
+      } finally {
+        sendPSettingsButton.disabled = false;
       }
     });
 
@@ -402,6 +441,7 @@
     });
 
     updateOnOffSettingsVisibility();
+    updatePSettingsVisibility();
 
     toggleChartButton.addEventListener("click", () => {
       chartPaused = !chartPaused;

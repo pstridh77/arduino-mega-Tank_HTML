@@ -19,12 +19,16 @@ const float MOTOR_SHUTDOWN_LEVEL_MM = 550.0F;
 const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
 const int DEFAULT_ON_OFF_HYSTERESIS_MM = 10;
 const int DEFAULT_ON_OFF_PWM = 180;
+const float DEFAULT_P_GAIN = 1.0F;
+const float MIN_P_GAIN = 0.0F;
+const float MAX_P_GAIN = 10.0F;
 
 String serialLine;
 unsigned long lastLevelSampleTime;
 int desiredLevelMm = 250;
 int onOffHysteresisMm = DEFAULT_ON_OFF_HYSTERESIS_MM;
 int onOffPwm = DEFAULT_ON_OFF_PWM;
+float pGain = DEFAULT_P_GAIN;
 bool onOffPumpRunning = false;
 
 enum RegulationMode {
@@ -104,6 +108,13 @@ void updateOnOffMotorPwm(float measuredLevel) {
   }
 
   const int requestedMotorPwm = onOffPumpRunning ? onOffPwm : 0;
+  writeMotorPwm(requestedMotorPwm);
+}
+
+void updateProportionalMotorPwm(float measuredLevel) {
+  const float levelError = desiredLevelMm - measuredLevel;
+  const int requestedMotorPwm = levelError > 0.0F ? constrain(static_cast<int>(levelError * pGain), 0, 255) : 0;
+
   writeMotorPwm(requestedMotorPwm);
 }
 
@@ -195,6 +206,19 @@ void handleSerialLine(String line) {
       Serial.println("ONOFF:" + String(onOffHysteresisMm) + "|" + String(onOffPwm));
     } else {
       Serial.println("ONOFF:ERROR");
+    }
+    return;
+  }
+
+  if (line.startsWith("PGAIN:")) {
+    const String gainText = line.substring(6);
+    const float gain = gainText.toFloat();
+
+    if (gainText.length() > 0 && gain >= MIN_P_GAIN && gain <= MAX_P_GAIN) {
+      pGain = gain;
+      Serial.println("PGAIN:" + String(pGain, 1));
+    } else {
+      Serial.println("PGAIN:ERROR");
     }
     return;
   }
@@ -294,6 +318,8 @@ void loop() {
       updateManualMotorPwm();
     } else if (regulationMode == MODE_ON_OFF) {
       updateOnOffMotorPwm(measuredLevel);
+    } else if (regulationMode == MODE_P) {
+      updateProportionalMotorPwm(measuredLevel);
     }
   }
 }
