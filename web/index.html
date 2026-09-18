@@ -20,6 +20,11 @@
           <output id="motorPwmValue" for="motorPwm">0</output>
         </div>
         <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
+        <div class="potentiometer-reading">
+          <span>Potentiometer A2</span>
+          <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
+          <span>PWM: <output id="potentiometerPwm">-- / 255</output></span>
+        </div>
       </section>
 
       <section class="panel-section" aria-labelledby="controlModeTitle">
@@ -76,6 +81,8 @@
     const connectButton = document.querySelector("#connectButton");
     const motorPwm = document.querySelector("#motorPwm");
     const motorPwmValue = document.querySelector("#motorPwmValue");
+    const potentiometerValue = document.querySelector("#potentiometerValue");
+    const potentiometerPwm = document.querySelector("#potentiometerPwm");
     const controlMode = document.querySelector("#controlMode");
     const measuredLevel = document.querySelector("#measuredLevel");
     const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
@@ -212,10 +219,26 @@
         sendCommand("LCD:FMTS|Ready").catch((error) => {
           setStatus(`Kunde inte bekräfta webbanslutningen: ${error.message}`, true);
         });
+        sendCommand(`MODE:${controlMode.value}`).catch((error) => {
+          setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+        });
         return;
       }
 
       if (!line.startsWith("LEVEL:")) {
+        if (line.startsWith("POT:")) {
+          const values = line.substring(4).split("|").map(Number);
+
+          if (values.length === 2 && values.every(Number.isFinite)) {
+            potentiometerValue.value = `${values[0]} / 1023`;
+            potentiometerPwm.value = `${values[1]} / 255`;
+
+            if (controlMode.value === "manual") {
+              motorPwm.value = values[1];
+              motorPwmValue.value = values[1];
+            }
+          }
+        }
         return;
       }
 
@@ -285,6 +308,11 @@
       setStatus(`Önskad nivå skickad: ${desiredLevel.value} mm.`);
     }
 
+    async function sendControlMode() {
+      await sendCommand(`MODE:${controlMode.value}`);
+      setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
+    }
+
     connectButton.addEventListener("click", async () => {
       if (!("serial" in navigator)) {
         setStatus("Web Serial stöds i Chrome eller Edge.", true);
@@ -318,8 +346,12 @@
       motorPwmValue.value = motorPwm.value;
     });
 
-    controlMode.addEventListener("change", () => {
-      setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
+    controlMode.addEventListener("change", async () => {
+      try {
+        await sendControlMode();
+      } catch (error) {
+        setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+      }
     });
 
     toggleChartButton.addEventListener("click", () => {

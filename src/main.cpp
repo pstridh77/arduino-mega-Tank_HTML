@@ -6,6 +6,7 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 const byte LCD_BACKLIGHT_PIN = 10;
 const byte MOTOR_DIRECTION_PIN = 13;
 const byte MOTOR_PWM_PIN = 11;
+const byte MOTOR_POTENTIOMETER_PIN = A2;
 const byte LEVEL_SENSOR_PIN = A4;
 
 const float ADC_MAX_VALUE = 1023.0F;
@@ -19,6 +20,15 @@ const unsigned long LEVEL_SAMPLE_INTERVAL_MS = 250;
 String serialLine;
 unsigned long lastLevelSampleTime;
 int desiredLevelMm = 250;
+
+enum RegulationMode {
+  MODE_MANUAL,
+  MODE_ON_OFF,
+  MODE_P,
+  MODE_PI,
+};
+
+RegulationMode regulationMode = MODE_MANUAL;
 
 float readMeasuredLevel() {
   const int sensorValue = analogRead(LEVEL_SENSOR_PIN);
@@ -38,6 +48,17 @@ void reportMeasuredLevel() {
   Serial.print(desiredLevelMm);
   Serial.print('|');
   Serial.println(levelError, 1);
+}
+
+void updateManualMotorPwm() {
+  const int potentiometerValue = analogRead(MOTOR_POTENTIOMETER_PIN);
+  const int motorPwm = potentiometerValue * 255L / ADC_MAX_VALUE;
+
+  analogWrite(MOTOR_PWM_PIN, motorPwm);
+  Serial.print("POT:");
+  Serial.print(potentiometerValue);
+  Serial.print('|');
+  Serial.println(motorPwm);
 }
 
 String fitLcdLine(String text) {
@@ -67,6 +88,26 @@ void showMeasurement(String name, String value, String unit) {
 
 void handleSerialLine(String line) {
   line.trim();
+
+  if (line.startsWith("MODE:")) {
+    const String mode = line.substring(5);
+
+    if (mode == "manual") {
+      regulationMode = MODE_MANUAL;
+    } else if (mode == "on-off") {
+      regulationMode = MODE_ON_OFF;
+    } else if (mode == "p") {
+      regulationMode = MODE_P;
+    } else if (mode == "pi") {
+      regulationMode = MODE_PI;
+    } else {
+      Serial.println("MODE:ERROR");
+      return;
+    }
+
+    Serial.println("MODE:" + mode);
+    return;
+  }
 
   if (line.startsWith("SETPOINT:")) {
     const String valueText = line.substring(9);
@@ -163,5 +204,9 @@ void loop() {
   if (currentTime - lastLevelSampleTime >= LEVEL_SAMPLE_INTERVAL_MS) {
     lastLevelSampleTime = currentTime;
     reportMeasuredLevel();
+
+    if (regulationMode == MODE_MANUAL) {
+      updateManualMotorPwm();
+    }
   }
 }

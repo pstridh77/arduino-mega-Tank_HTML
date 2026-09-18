@@ -150,6 +150,31 @@ input:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.potentiometer-reading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.potentiometer-reading > output {
+  color: var(--accent-dark);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.potentiometer-reading span:last-child {
+  white-space: nowrap;
+}
+
+.potentiometer-reading span:last-child output {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .level-values {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
