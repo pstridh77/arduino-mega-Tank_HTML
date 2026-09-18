@@ -28,7 +28,7 @@ body {
 }
 
 main {
-  width: min(100%, 520px);
+  width: min(100%, 1280px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 92%, white);
@@ -59,9 +59,16 @@ h2 {
 
 .controls {
   display: grid;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
   gap: 18px;
   margin-top: 28px;
   font-family: "Segoe UI", sans-serif;
+}
+
+#connectButton,
+.status,
+.panel-section[aria-labelledby="levelTitle"] {
+  grid-column: 1 / -1;
 }
 
 button {
@@ -92,7 +99,8 @@ label {
 }
 
 input[type="text"],
-input[type="number"] {
+input[type="number"],
+select {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--border);
