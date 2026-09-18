@@ -28,16 +28,19 @@ int onOffPwm = DEFAULT_ON_OFF_PWM;
 bool onOffPumpRunning = false;
 
 enum RegulationMode {
+  MODE_OFF,
   MODE_MANUAL,
   MODE_ON_OFF,
   MODE_P,
   MODE_PI,
 };
 
-RegulationMode regulationMode = MODE_MANUAL;
+RegulationMode regulationMode = MODE_OFF;
 
 String regulationModeLabel() {
   switch (regulationMode) {
+    case MODE_OFF:
+      return "OFF";
     case MODE_ON_OFF:
       return "On/Off";
     case MODE_P:
@@ -71,7 +74,9 @@ void reportMeasuredLevel() {
 }
 
 int writeMotorPwm(int requestedPwm) {
-  const int safeMotorPwm = readMeasuredLevel() > MOTOR_SHUTDOWN_LEVEL_MM ? 0 : requestedPwm;
+  const int safeMotorPwm = regulationMode == MODE_OFF || readMeasuredLevel() > MOTOR_SHUTDOWN_LEVEL_MM
+    ? 0
+    : requestedPwm;
 
   analogWrite(MOTOR_PWM_PIN, safeMotorPwm);
   return safeMotorPwm;
@@ -137,7 +142,9 @@ void handleSerialLine(String line) {
   if (line.startsWith("MODE:")) {
     const String mode = line.substring(5);
 
-    if (mode == "manual") {
+    if (mode == "off") {
+      regulationMode = MODE_OFF;
+    } else if (mode == "manual") {
       regulationMode = MODE_MANUAL;
     } else if (mode == "on-off") {
       regulationMode = MODE_ON_OFF;
@@ -150,6 +157,7 @@ void handleSerialLine(String line) {
       return;
     }
 
+    writeMotorPwm(0);
     showRegulationStatus(desiredLevelMm - readMeasuredLevel());
     Serial.println("MODE:" + mode);
     return;
