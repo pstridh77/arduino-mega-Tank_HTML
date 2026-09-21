@@ -203,6 +203,11 @@ void showRegulationStatus(float levelError) {
   showLcdLines("Reg: " + regulationModeLabel(), "Fel: " + String(levelError, 1) + " mm");
 }
 
+void showManualMotorStatus() {
+  const float motorPercent = currentMotorPwm * 100.0F / 255.0F;
+  showLcdLines("Reg: Manuell", "Motor: " + String(motorPercent, 1) + "%");
+}
+
 void handleSerialLine(String line) {
   line.trim();
 
@@ -389,6 +394,7 @@ void loop() {
 
     if (regulationMode == MODE_MANUAL) {
       updateManualMotorPwm();
+      showManualMotorStatus();
     } else if (regulationMode == MODE_ON_OFF) {
       updateOnOffMotorPwm(measuredLevel);
     } else if (regulationMode == MODE_P) {
