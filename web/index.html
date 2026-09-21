@@ -140,8 +140,10 @@
             <div class="tank-scale"><span>500 mm</span><span>250 mm</span><span>0 mm</span></div>
             <div class="tank-pipe">
               <div id="tankWater" class="tank-water"></div>
+              <div id="tankDesiredLine" class="tank-desired-line"></div>
               <div class="tank-level-line"></div>
             </div>
+            <span id="tankDesiredLabel" class="tank-desired-label">Börvärde</span>
           </div>
           <output id="processLevelValue" class="process-level-value">-- mm</output>
           <p>Vattnet fylls från botten. Tankens höjd är 500 mm.</p>
@@ -208,6 +210,7 @@
           <text class="diagram-label diagram-feedback" x="384" y="181" text-anchor="middle">Ärvärde</text>
           <text id="diagramFeedback" class="diagram-value diagram-feedback" x="384" y="214" text-anchor="middle">-- mm</text>
         </svg>
+        <button class="emergency-stop diagram-stop-button" data-emergency-stop type="button" disabled>STOPP</button>
       </figure>
 
       <section class="panel-section" aria-labelledby="levelTitle">
@@ -231,7 +234,10 @@
             <span><i class="measured"></i>Uppmätt</span>
             <span><i class="desired"></i>Önskad</span>
           </div>
-          <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
+          <div class="chart-actions">
+            <button class="emergency-stop graph-stop-button" data-emergency-stop type="button" disabled>STOPP</button>
+            <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
+          </div>
         </div>
         <div class="chart-layout">
           <div class="chart-card level-chart">
@@ -251,6 +257,7 @@
 
   <script>
     const connectButton = document.querySelector("#connectButton");
+    const emergencyStopButtons = document.querySelectorAll("[data-emergency-stop]");
     const motorPwmValue = document.querySelector("#motorPwmValue");
     const controlMode = document.querySelector("#controlMode");
     const onOffSettings = document.querySelector("#onOffSettings");
@@ -298,6 +305,8 @@
     const diagramProcess = document.querySelector("#diagramProcess");
     const processDialog = document.querySelector("#processDialog");
     const tankWater = document.querySelector("#tankWater");
+    const tankDesiredLine = document.querySelector("#tankDesiredLine");
+    const tankDesiredLabel = document.querySelector("#tankDesiredLabel");
     const processLevelValue = document.querySelector("#processLevelValue");
     const sensorAdcValue = document.querySelector("#sensorAdcValue");
     const sensorVoltageValue = document.querySelector("#sensorVoltageValue");
@@ -315,6 +324,7 @@
     const statusText = document.querySelector("#status");
 
     const serialControls = [
+      ...emergencyStopButtons,
       controlMode,
       openSignalExplanationButton,
       onOffHysteresis,
@@ -594,7 +604,7 @@
       diagramError.textContent = `${error.toFixed(1)} mm`;
       diagramOutput.textContent = `${measured.toFixed(1)} mm`;
       diagramSensor.textContent = `${measured.toFixed(1)} mm`;
-      updateProcessTank(measured);
+      updateProcessTank(measured, desired);
       diagramFeedback.textContent = `${measured.toFixed(1)} mm`;
       updateSignalExplanation();
 
@@ -633,7 +643,7 @@
     }
 
     function updateMotorDisplay(pwm) {
-      const percent = Math.round((Number(pwm) / 255) * 100);
+      const percent = (Number(pwm) / 255 * 100).toFixed(1);
       latestOutputPwm = Number(pwm);
       motorPwmValue.value = `${pwm} PWM`;
       motorPwmPercent.value = `${percent}%`;
@@ -641,10 +651,14 @@
       updateSignalExplanation();
     }
 
-    function updateProcessTank(level) {
+    function updateProcessTank(level, desired = latestDesired ?? Number(desiredLevel.value)) {
       const boundedLevel = Math.max(0, Math.min(500, Number(level)));
       const percentage = Number.isFinite(boundedLevel) ? (boundedLevel / 500) * 100 : 0;
+      const boundedDesired = Math.max(0, Math.min(500, Number(desired)));
+      const desiredPercentage = Number.isFinite(boundedDesired) ? (boundedDesired / 500) * 100 : 0;
       tankWater.style.height = `${percentage}%`;
+      tankDesiredLine.style.bottom = `${desiredPercentage}%`;
+      tankDesiredLabel.style.bottom = `${desiredPercentage}%`;
       processLevelValue.textContent = Number.isFinite(boundedLevel) ? `${boundedLevel.toFixed(1)} mm` : "-- mm";
     }
 
@@ -663,7 +677,7 @@
       const measured = latestMeasured;
       const error = latestError;
       const outputPwm = latestOutputPwm;
-      const outputPercent = Math.round((outputPwm / 255) * 100);
+      const outputPercent = (outputPwm / 255 * 100).toFixed(1);
       const mode = controlMode.value;
       const gain = Number(pGain.value);
 
@@ -712,6 +726,8 @@
 
       desiredLevelDisplay.value = Number(desiredLevel.value).toFixed(1);
       diagramDesired.textContent = `${Number(desiredLevel.value).toFixed(1)} mm`;
+      latestDesired = Number(desiredLevel.value);
+      updateProcessTank(latestProcessLevel ?? 0, latestDesired);
       await sendCommand(`SETPOINT:${desiredLevel.value}`);
       setStatus(`Önskad nivå skickad: ${desiredLevel.value} mm.`);
     }
@@ -804,6 +820,29 @@
       }
     });
 
+    emergencyStopButtons.forEach((emergencyStopButton) => {
+      emergencyStopButton.addEventListener("click", async () => {
+        emergencyStopButtons.forEach((button) => {
+          button.disabled = true;
+        });
+      controlMode.value = "off";
+      updateRegulatorSettingsVisibility();
+      updateDiagramFeedbackVisibility();
+      diagramMode.textContent = "Off";
+
+      try {
+        await sendCommand("MODE:off");
+        setStatus("STOPP", true);
+      } catch (error) {
+        setStatus(`STOPP kunde inte skickas: ${error.message}`, true);
+      } finally {
+        emergencyStopButtons.forEach((button) => {
+          button.disabled = false;
+        });
+      }
+      });
+    });
+
     controlMode.addEventListener("change", async () => {
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
@@ -819,9 +858,76 @@
       }
     });
 
+    let dialogLayer = 1000;
+
+    function openFloatingDialog(dialog) {
+      if (!dialog.open) {
+        dialog.show();
+      }
+
+      dialogLayer += 1;
+      dialog.style.zIndex = dialogLayer;
+
+      if (!dialog.dataset.positioned) {
+        const bounds = dialog.getBoundingClientRect();
+        const left = Math.max(16, (window.innerWidth - bounds.width) / 2);
+        const top = Math.max(16, (window.innerHeight - bounds.height) / 2);
+        dialog.style.left = `${left}px`;
+        dialog.style.top = `${top}px`;
+        dialog.dataset.positioned = "true";
+      }
+    }
+
+    function makeDialogDraggable(dialog) {
+      const heading = dialog.querySelector(".dialog-heading");
+      if (!heading) {
+        return;
+      }
+
+      heading.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button")) {
+          return;
+        }
+
+        event.preventDefault();
+        dialogLayer += 1;
+        dialog.style.zIndex = dialogLayer;
+
+        const bounds = dialog.getBoundingClientRect();
+        const offsetX = event.clientX - bounds.left;
+        const offsetY = event.clientY - bounds.top;
+
+        const moveDialog = (moveEvent) => {
+          const left = Math.max(8, Math.min(window.innerWidth - bounds.width - 8, moveEvent.clientX - offsetX));
+          const top = Math.max(8, Math.min(window.innerHeight - bounds.height - 8, moveEvent.clientY - offsetY));
+          dialog.style.left = `${left}px`;
+          dialog.style.top = `${top}px`;
+        };
+
+        const stopDragging = () => {
+          heading.releasePointerCapture?.(event.pointerId);
+          heading.removeEventListener("pointermove", moveDialog);
+          heading.removeEventListener("pointerup", stopDragging);
+          heading.removeEventListener("pointercancel", stopDragging);
+        };
+
+        heading.setPointerCapture?.(event.pointerId);
+        heading.addEventListener("pointermove", moveDialog);
+        heading.addEventListener("pointerup", stopDragging);
+        heading.addEventListener("pointercancel", stopDragging);
+      });
+
+      dialog.addEventListener("pointerdown", () => {
+        dialogLayer += 1;
+        dialog.style.zIndex = dialogLayer;
+      });
+    }
+
+    document.querySelectorAll("dialog").forEach(makeDialogDraggable);
+
     function openRegulatorControls() {
       if (!regulatorDialog.open) {
-        regulatorDialog.showModal();
+        openFloatingDialog(regulatorDialog);
       }
 
       controlMode.focus();
@@ -837,7 +943,7 @@
 
     function openMotorControls() {
       if (!motorDialog.open) {
-        motorDialog.showModal();
+        openFloatingDialog(motorDialog);
       }
     }
 
@@ -852,7 +958,7 @@
     function openSignalExplanation() {
       updateSignalExplanation();
       if (!signalExplanationDialog.open) {
-        signalExplanationDialog.showModal();
+        openFloatingDialog(signalExplanationDialog);
       }
     }
 
@@ -867,7 +973,7 @@
 
     function openSetpointControls() {
       if (!setpointDialog.open) {
-        setpointDialog.showModal();
+        openFloatingDialog(setpointDialog);
       }
 
       desiredLevel.focus();
@@ -883,7 +989,7 @@
 
     function openSensorControls() {
       if (!sensorDialog.open) {
-        sensorDialog.showModal();
+        openFloatingDialog(sensorDialog);
       }
     }
 
@@ -898,7 +1004,7 @@
     function openProcessControls() {
       updateProcessTank(latestProcessLevel ?? latestMeasured ?? 0);
       if (!processDialog.open) {
-        processDialog.showModal();
+        openFloatingDialog(processDialog);
       }
     }
 
