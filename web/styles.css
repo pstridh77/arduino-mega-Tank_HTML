@@ -638,3 +638,11 @@ input:checked + .slider::after {
   fill: var(--accent-dark);
   outline: none;
 }
+
+#controlDiagram.open-loop .diagram-feedback {
+  visibility: hidden;
+}
+
+body.manual-mode .manual-error-display {
+  display: none;
+}

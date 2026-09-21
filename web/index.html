@@ -71,7 +71,7 @@
           <div class="signal-facts">
             <div><span>Börvärde</span><output id="explanationDesired">-- mm</output></div>
             <div><span>Mätvärde</span><output id="explanationMeasured">-- mm</output></div>
-            <div><span>Fel</span><output id="explanationError">-- mm</output></div>
+            <div class="manual-error-display"><span>Fel</span><output id="explanationError">-- mm</output></div>
             <div><span>Styrsignal</span><output id="explanationOutput">-- PWM / --%</output></div>
             <div><span>P-del</span><output id="explanationPContribution">0 PWM</output></div>
             <div><span>I-del</span><output id="explanationIContribution">0 PWM</output></div>
@@ -119,7 +119,7 @@
 
       <figure class="control-diagram" aria-labelledby="diagramTitle">
         <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
-        <svg viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
+        <svg id="controlDiagram" viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
           <desc id="diagramDescription">Börvärdet jämförs med ärvärdet. Reglerfelet behandlas av regulatorn som skickar en styrsignal till processen. En givare mäter processen och återkopplar ärvärdet.</desc>
           <defs>
             <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -141,7 +141,7 @@
           </g>
           <line class="diagram-line" x1="304" y1="68" x2="366" y2="68" marker-end="url(#arrowHead)"></line>
           <text class="diagram-label" x="335" y="53" text-anchor="middle">Reglerfel</text>
-          <text id="diagramError" class="diagram-value" x="335" y="91" text-anchor="middle">-- mm</text>
+          <text id="diagramError" class="diagram-value manual-error-display" x="335" y="91" text-anchor="middle">-- mm</text>
 
           <g id="diagramRegulator" class="diagram-box diagram-regulator" role="button" tabindex="0" aria-label="Välj regulator" aria-controls="controlMode">
             <rect x="366" y="34" width="160" height="68" rx="6"></rect>
@@ -172,10 +172,10 @@
             <text x="565" y="184" text-anchor="middle">Givare</text>
             <text id="diagramSensor" x="565" y="206" text-anchor="middle">-- mm</text>
           </g>
-          <line class="diagram-line" x1="465" y1="190" x2="278" y2="190"></line>
-          <line class="diagram-line" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
-          <text class="diagram-label" x="384" y="181" text-anchor="middle">Ärvärde</text>
-          <text id="diagramFeedback" class="diagram-value" x="384" y="214" text-anchor="middle">-- mm</text>
+          <line class="diagram-line diagram-feedback" x1="465" y1="190" x2="278" y2="190"></line>
+          <line class="diagram-line diagram-feedback" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label diagram-feedback" x="384" y="181" text-anchor="middle">Ärvärde</text>
+          <text id="diagramFeedback" class="diagram-value diagram-feedback" x="384" y="214" text-anchor="middle">-- mm</text>
         </svg>
       </figure>
 
@@ -190,7 +190,7 @@
             <span>Önskad</span>
             <div><output id="desiredLevelDisplay">--</output> mm</div>
           </div>
-          <div class="level-reading error">
+          <div class="level-reading error manual-error-display">
             <span>Fel</span>
             <div><output id="levelError" aria-live="polite">--</output> mm</div>
           </div>
@@ -207,7 +207,7 @@
             <div class="chart-card-heading">Uppmätt / Önskad</div>
             <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
           </div>
-          <div class="chart-card error-panel" aria-label="Reglerfel">
+          <div class="chart-card error-panel manual-error-display" aria-label="Reglerfel">
             <div class="chart-card-heading">Fel</div>
             <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
           </div>
@@ -246,6 +246,8 @@
     const diagramSetpoint = document.querySelector("#diagramSetpoint");
     const setpointDialog = document.querySelector("#setpointDialog");
     const diagramMode = document.querySelector("#diagramMode");
+    const controlDiagram = document.querySelector("#controlDiagram");
+    const feedbackElements = controlDiagram.querySelectorAll(".diagram-feedback");
     const diagramControlSignal = document.querySelector("#diagramControlSignal");
     const openSignalExplanationButton = document.querySelector("#openSignalExplanationButton");
     const signalExplanationDialog = document.querySelector("#signalExplanationDialog");
@@ -659,6 +661,15 @@
       onOffSettings.hidden = controlMode.value !== "on-off";
     }
 
+    function updateDiagramFeedbackVisibility() {
+      const openLoopMode = controlMode.value === "manual";
+      controlDiagram.classList.toggle("open-loop", openLoopMode);
+      document.body.classList.toggle("manual-mode", openLoopMode);
+      feedbackElements.forEach((element) => {
+        element.style.visibility = openLoopMode ? "hidden" : "visible";
+      });
+    }
+
     async function sendOnOffSettings() {
       if (!onOffHysteresis.reportValidity() || !onOffPwm.reportValidity()) {
         return;
@@ -727,6 +738,7 @@
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
+      updateDiagramFeedbackVisibility();
       diagramMode.textContent = controlMode.options[controlMode.selectedIndex].text;
       updateSignalExplanation();
       try {
@@ -837,6 +849,7 @@
     updateOnOffSettingsVisibility();
     updatePSettingsVisibility();
     updatePiSettingsVisibility();
+    updateDiagramFeedbackVisibility();
 
     toggleChartButton.addEventListener("click", () => {
       chartPaused = !chartPaused;
