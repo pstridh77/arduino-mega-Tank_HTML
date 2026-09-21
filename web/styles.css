@@ -365,6 +365,9 @@ input:disabled {
   border-radius: 8px;
   background: #fffdf8;
 }
+.panel-section[aria-labelledby="levelTitle"] {
+  position: relative;
+}
 
 .section-heading {
   display: flex;
@@ -529,6 +532,9 @@ input:disabled {
 }
 
 .chart-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
   display: grid;
   justify-items: end;
   gap: 6px;
@@ -633,8 +639,8 @@ input[type="range"]:disabled {
   height: 32px;
   border-radius: 50%;
   background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  transition: transform 160ms ease;
+  top: 16px;
+  right: 16px;
 }
 
 input:checked + .slider {
