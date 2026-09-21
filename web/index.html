@@ -8,7 +8,7 @@
 </head>
 <body>
   <main>
-    <h1>Arduino panel</h1>
+    <h1>Nivåtank</h1>
     <p>Anslut till Arduino Mega via USB och styr motor och nivåreglering.</p>
 
     <div class="controls">
@@ -48,7 +48,7 @@
               <input id="pGain" type="number" min="0" max="10" step="0.2" value="1.0" disabled>
               <span>K</span>
             </div>
-            <button id="sendPSettingsButton" type="button" disabled>Ställ in P-regulator</button>
+            <button id="sendPSettingsButton" type="button" disabled>Ställ in P-Del</button>
           </div>
           <div id="piSettings" class="mode-settings" hidden>
             <label for="piIntegralGain">Integralförstärkning Ki</label>
@@ -56,7 +56,7 @@
               <input id="piIntegralGain" type="number" min="0" max="2" step="0.05" value="0.1" disabled>
               <span>Ki</span>
             </div>
-            <button id="sendPiSettingsButton" type="button" disabled>Ställ in PI-regulator</button>
+            <button id="sendPiSettingsButton" type="button" disabled>Ställ in I-Del</button>
           </div>
         </form>
       </dialog>
@@ -73,8 +73,8 @@
             <div><span>Mätvärde</span><output id="explanationMeasured">-- mm</output></div>
             <div class="manual-error-display"><span>Fel</span><output id="explanationError">-- mm</output></div>
             <div><span>Styrsignal</span><output id="explanationOutput">-- PWM / --%</output></div>
-            <div><span>P-del</span><output id="explanationPContribution">0 PWM</output></div>
-            <div><span>I-del</span><output id="explanationIContribution">0 PWM</output></div>
+            <div id="explanationPFact"><span>P-del</span><output id="explanationPContribution">0 PWM</output></div>
+            <div id="explanationIFact"><span>I-del</span><output id="explanationIContribution">0 PWM</output></div>
           </div>
           <div id="signalMethod" class="signal-method" aria-live="polite">Beräkning: --</div>
           <div id="signalFormula" class="signal-formula" aria-live="polite">--</div>
@@ -94,11 +94,6 @@
               <output id="motorPwmValue">0 PWM</output>
             </div>
           </div>
-          <div class="potentiometer-reading">
-            <span>Potentiometer A2</span>
-            <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
-            <span>PWM: <output id="potentiometerPwm">-- / 255</output></span>
-          </div>
         </form>
       </dialog>
 
@@ -114,6 +109,24 @@
             <span>mm</span>
             <button id="sendSetpointButton" type="button" disabled>Ställ in</button>
           </div>
+        </form>
+      </dialog>
+
+      <dialog id="sensorDialog" aria-labelledby="sensorTitle">
+        <form method="dialog" class="regulator-dialog-content sensor-explanation">
+          <div class="dialog-heading">
+            <h2 id="sensorTitle">Så räknas nivån ut</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng nivåberäkning">Stäng</button>
+          </div>
+          <p>Arduino läser spänningen på nivågivaren via Analog In A4 och räknar om den till avstånd och tanknivå.</p>
+          <div class="sensor-steps">
+            <div><span>Spänning</span><output id="sensorVoltageValue">-- V</output></div>
+            <div><span>Analog In A4</span><output id="sensorAdcValue">-- / 1023</output></div>
+            <div><span>Uppmätt avstånd</span><output id="sensorDistanceValue">-- mm</output></div>
+            <div><span>Tanknivå</span><output id="sensorLevelValue">-- mm</output></div>
+          </div>
+          <div class="signal-method">ADC -> spänning -> avstånd -> tanknivå</div>
+          <div id="sensorFormula" class="signal-formula">--</div>
         </form>
       </dialog>
 
@@ -170,7 +183,7 @@
           <g class="diagram-box">
             <rect x="465" y="156" width="200" height="68" rx="6"></rect>
             <text x="565" y="184" text-anchor="middle">Givare</text>
-            <text id="diagramSensor" x="565" y="206" text-anchor="middle">-- mm</text>
+            <text id="diagramSensor" class="diagram-interactive" x="565" y="206" text-anchor="middle" role="button" tabindex="0" aria-label="Visa nivåberäkning">-- mm</text>
           </g>
           <line class="diagram-line diagram-feedback" x1="465" y1="190" x2="278" y2="190"></line>
           <line class="diagram-line diagram-feedback" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
@@ -221,8 +234,6 @@
   <script>
     const connectButton = document.querySelector("#connectButton");
     const motorPwmValue = document.querySelector("#motorPwmValue");
-    const potentiometerValue = document.querySelector("#potentiometerValue");
-    const potentiometerPwm = document.querySelector("#potentiometerPwm");
     const controlMode = document.querySelector("#controlMode");
     const onOffSettings = document.querySelector("#onOffSettings");
     const onOffHysteresis = document.querySelector("#onOffHysteresis");
@@ -258,11 +269,19 @@
     const explanationOutput = document.querySelector("#explanationOutput");
     const explanationPContribution = document.querySelector("#explanationPContribution");
     const explanationIContribution = document.querySelector("#explanationIContribution");
+    const explanationPFact = document.querySelector("#explanationPFact");
+    const explanationIFact = document.querySelector("#explanationIFact");
     const signalMethod = document.querySelector("#signalMethod");
     const signalFormula = document.querySelector("#signalFormula");
     const motorPwmPercent = document.querySelector("#motorPwmPercent");
     const diagramOutput = document.querySelector("#diagramOutput");
     const diagramSensor = document.querySelector("#diagramSensor");
+    const sensorDialog = document.querySelector("#sensorDialog");
+    const sensorAdcValue = document.querySelector("#sensorAdcValue");
+    const sensorVoltageValue = document.querySelector("#sensorVoltageValue");
+    const sensorDistanceValue = document.querySelector("#sensorDistanceValue");
+    const sensorLevelValue = document.querySelector("#sensorLevelValue");
+    const sensorFormula = document.querySelector("#sensorFormula");
     const diagramFeedback = document.querySelector("#diagramFeedback");
     const desiredLevel = document.querySelector("#desiredLevel");
     const sendSetpointButton = document.querySelector("#sendSetpointButton");
@@ -297,6 +316,9 @@
     let latestOutputPwm = 0;
     let latestPContribution = 0;
     let latestIContribution = 0;
+    let latestSensorAdc = null;
+    let latestSensorVoltage = null;
+    let latestSensorDistance = null;
     const levelHistory = [];
     const chartTimeSpanMs = 60000;
     const chartMaxLevel = 500;
@@ -498,6 +520,17 @@
       }
 
       if (!line.startsWith("LEVEL:")) {
+        if (line.startsWith("SENSOR:")) {
+          const sensorValues = line.substring(7).split("|").map(Number);
+
+          if (sensorValues.length === 4 && sensorValues.every(Number.isFinite)) {
+            latestSensorAdc = sensorValues[0];
+            latestSensorVoltage = sensorValues[1];
+            latestSensorDistance = sensorValues[2];
+            updateSensorExplanation(sensorValues[3]);
+          }
+        }
+
         if (line.startsWith("OUTPUT:")) {
           const outputValues = line.substring(7).split("|").map(Number);
           const outputPwm = outputValues[0];
@@ -511,19 +544,6 @@
           }
         }
 
-        if (line.startsWith("POT:")) {
-          const values = line.substring(4).split("|").map(Number);
-
-          if (values.length === 2 && values.every(Number.isFinite)) {
-            potentiometerValue.value = `${values[0]} / 1023`;
-            potentiometerPwm.value = `${values[1]} / 255`;
-
-            if (controlMode.value === "manual") {
-              updateMotorDisplay(values[1]);
-            }
-
-          }
-        }
         return;
       }
 
@@ -596,6 +616,16 @@
       updateSignalExplanation();
     }
 
+    function updateSensorExplanation(level) {
+      sensorAdcValue.textContent = latestSensorAdc === null ? "-- / 1023" : `${latestSensorAdc} / 1023`;
+      sensorVoltageValue.textContent = latestSensorVoltage === null ? "-- V" : `${latestSensorVoltage.toFixed(3)} V`;
+      sensorDistanceValue.textContent = latestSensorDistance === null ? "-- mm" : `${latestSensorDistance.toFixed(1)} mm`;
+      sensorLevelValue.textContent = `${level.toFixed(1)} mm`;
+      sensorFormula.textContent = latestSensorVoltage === null
+        ? "--"
+        : `${latestSensorVoltage.toFixed(3)} V -> ${latestSensorDistance.toFixed(1)} mm avstånd -> ${level.toFixed(1)} mm tanknivå`;
+    }
+
     function updateSignalExplanation() {
       const desired = latestDesired ?? Number(desiredLevel.value);
       const measured = latestMeasured;
@@ -611,6 +641,8 @@
       explanationOutput.textContent = `${outputPwm} PWM / ${outputPercent}%`;
       explanationPContribution.textContent = `${latestPContribution.toFixed(1)} PWM`;
       explanationIContribution.textContent = `${latestIContribution.toFixed(1)} PWM`;
+      explanationPFact.hidden = mode !== "p" && mode !== "pi";
+      explanationIFact.hidden = mode !== "pi";
 
       if (mode === "manual") {
         signalExplanationText.textContent = "I manuellt läge kommer styrsignalen direkt från potentiometern.";
@@ -696,6 +728,12 @@
       piSettings.hidden = controlMode.value !== "pi";
     }
 
+    function updateRegulatorSettingsVisibility() {
+      onOffSettings.hidden = controlMode.value !== "on-off";
+      pSettings.hidden = controlMode.value !== "p" && controlMode.value !== "pi";
+      piSettings.hidden = controlMode.value !== "pi";
+    }
+
     async function sendPiSettings() {
       if (!piIntegralGain.reportValidity()) {
         return;
@@ -738,6 +776,7 @@
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
+      updateRegulatorSettingsVisibility();
       updateDiagramFeedbackVisibility();
       diagramMode.textContent = controlMode.options[controlMode.selectedIndex].text;
       updateSignalExplanation();
@@ -810,6 +849,20 @@
       }
     });
 
+    function openSensorControls() {
+      if (!sensorDialog.open) {
+        sensorDialog.showModal();
+      }
+    }
+
+    diagramSensor.addEventListener("click", openSensorControls);
+    diagramSensor.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSensorControls();
+      }
+    });
+
     sendPiSettingsButton.addEventListener("click", async () => {
       sendPiSettingsButton.disabled = true;
 
@@ -849,6 +902,7 @@
     updateOnOffSettingsVisibility();
     updatePSettingsVisibility();
     updatePiSettingsVisibility();
+    updateRegulatorSettingsVisibility();
     updateDiagramFeedbackVisibility();
 
     toggleChartButton.addEventListener("click", () => {

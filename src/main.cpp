@@ -86,6 +86,22 @@ void reportMeasuredLevel() {
   Serial.println(levelError, 1);
 }
 
+void reportSensorDetails() {
+  const int sensorAdc = analogRead(LEVEL_SENSOR_PIN);
+  const float sensorVoltage = sensorAdc * ADC_REFERENCE_VOLTAGE / ADC_MAX_VALUE;
+  const float sensorDistance = sensorVoltage * SENSOR_RANGE_MM / SENSOR_FULL_SCALE_VOLTAGE;
+  const float measuredLevel = MAX_LEVEL_MM + MIN_LEVEL_MM - sensorDistance;
+
+  Serial.print("SENSOR:");
+  Serial.print(sensorAdc);
+  Serial.print('|');
+  Serial.print(sensorVoltage, 3);
+  Serial.print('|');
+  Serial.print(sensorDistance, 1);
+  Serial.print('|');
+  Serial.println(measuredLevel, 1);
+}
+
 int writeMotorPwm(int requestedPwm) {
   const int safeMotorPwm = regulationMode == MODE_OFF || readMeasuredLevel() > MOTOR_SHUTDOWN_LEVEL_MM
     ? 0
@@ -368,6 +384,7 @@ void loop() {
     Serial.print(desiredLevelMm);
     Serial.print('|');
     Serial.println(levelError, 1);
+    reportSensorDetails();
     showRegulationStatus(levelError);
 
     if (regulationMode == MODE_MANUAL) {
