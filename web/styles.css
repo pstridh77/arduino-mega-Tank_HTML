@@ -14,6 +14,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -28,7 +32,7 @@ body {
 }
 
 main {
-  width: min(100%, 440px);
+  width: min(100%, 1280px);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 92%, white);
@@ -51,11 +55,221 @@ p {
   font-family: "Segoe UI", sans-serif;
 }
 
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
 .controls {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   margin-top: 28px;
   font-family: "Segoe UI", sans-serif;
+}
+
+.top-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+dialog {
+  width: min(100% - 32px, 480px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 70px rgba(42, 38, 28, 0.28);
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgba(32, 32, 29, 0.38);
+}
+
+.regulator-dialog-content {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-heading h2 {
+  color: var(--ink);
+}
+
+.motor-values {
+  display: grid;
+  gap: 2px;
+  color: var(--accent-dark);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.motor-values output:first-child {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.motor-values output:last-child {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.dialog-close {
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--muted);
+  font-size: 0.8rem;
+}
+
+.signal-explanation > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.signal-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.signal-facts div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffdf8;
+}
+
+.signal-facts span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.signal-facts output {
+  color: var(--accent-dark);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.signal-formula {
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: #edf5ef;
+  color: var(--ink);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.signal-method {
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: #f3f7f2;
+  color: var(--muted);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 0.9rem;
+}
+
+.control-diagram {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.control-diagram figcaption {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.control-diagram svg {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+}
+
+.diagram-box rect {
+  fill: #fffaf0;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.diagram-regulator {
+  cursor: pointer;
+}
+
+.diagram-regulator:hover rect,
+.diagram-regulator:focus rect,
+.diagram-actuator:hover rect,
+.diagram-actuator:focus rect,
+.diagram-setpoint:hover rect,
+.diagram-setpoint:focus rect {
+  fill: #edf5ef;
+  stroke: var(--accent);
+}
+
+.diagram-regulator:focus {
+  outline: none;
+}
+
+.diagram-box text,
+.diagram-sum text {
+  fill: var(--ink);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+
+.diagram-box text + text,
+.diagram-value {
+  fill: var(--accent-dark);
+  font-weight: 700;
+}
+
+.diagram-line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+
+.diagram-line marker-end {
+  fill: var(--muted);
+}
+
+.diagram-sum circle {
+  fill: #fffaf0;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.diagram-label {
+  fill: var(--muted);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 12px;
+}
+
+#connectButton,
+.status,
+.panel-section[aria-labelledby="levelTitle"] {
+  grid-column: 1 / -1;
 }
 
 button {
@@ -78,6 +292,30 @@ button:disabled {
   opacity: 0.55;
 }
 
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+input:disabled {
+  opacity: 0.6;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
@@ -87,6 +325,244 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fffdf8;
+}
+
+.panel-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-heading output {
+  min-width: 3ch;
+  color: var(--accent-dark);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.potentiometer-reading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.potentiometer-reading > output {
+  color: var(--accent-dark);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.potentiometer-reading span:last-child {
+  white-space: nowrap;
+}
+
+.potentiometer-reading span:last-child output {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.mode-settings {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.setting-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-control span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.mode-settings button {
+  min-height: 42px;
+}
+
+.level-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.level-reading {
+  font-variant-numeric: tabular-nums;
+}
+
+.level-reading > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.level-reading div {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.level-reading output {
+  font-size: 1.15rem;
+}
+
+.level-reading.measured div {
+  color: #24745f;
+}
+
+.level-reading.desired div {
+  color: #2463a0;
+}
+
+.level-reading.error div {
+  color: #b4492f;
+}
+
+.setpoint-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.setpoint-control button {
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.setpoint-control span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chart-legend i {
+  width: 16px;
+  height: 3px;
+  background: currentColor;
+}
+
+.chart-legend .measured {
+  color: #24745f;
+}
+
+.chart-legend .desired {
+  color: #2463a0;
+}
+
+.chart-toggle {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 11px;
+  font-size: 0.75rem;
+}
+
+.chart-toggle[aria-pressed="true"] {
+  background: #b4492f;
+}
+
+.chart-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 14px;
+}
+
+.chart-card {
+  width: 100%;
+  height: 260px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffdf8;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.chart-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 1.35rem;
+}
+
+.error-panel .chart-card-heading {
+  color: #b4492f;
+}
+
+.error-chart {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+}
+
+.level-chart canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]:disabled {
+  cursor: not-allowed;
+}
+
+.input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(78px, 0.35fr);
+  gap: 12px;
 }
 
 .switch {
@@ -140,4 +616,151 @@ input:checked + .slider::after {
 
 .status.error {
   color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .top-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .error-panel {
+    height: auto;
+    min-height: 90px;
+  }
+}
+
+.diagram-interactive {
+  cursor: pointer;
+}
+
+.diagram-interactive:hover,
+.diagram-interactive:focus {
+  fill: var(--accent-dark);
+  outline: none;
+}
+
+#controlDiagram.open-loop .diagram-feedback {
+  visibility: hidden;
+}
+
+body.manual-mode .manual-error-display {
+  display: none;
+}
+
+.sensor-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sensor-steps div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffdf8;
+}
+
+.sensor-steps span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sensor-steps output {
+  color: var(--accent-dark);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.process-explanation > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.tank-view {
+  display: grid;
+  grid-template-columns: 58px 96px;
+  justify-content: center;
+  align-items: stretch;
+  gap: 10px;
+  height: 300px;
+}
+
+.tank-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 0 0 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tank-pipe {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  border: 3px solid #78909c;
+  border-radius: 18px 18px 8px 8px;
+  background: #eef5f6;
+  box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.55);
+}
+
+.tank-water {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0;
+  background: linear-gradient(180deg, #63c6d8, #238aa5);
+  transition: height 700ms ease-out;
+}
+
+.tank-water::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -20%;
+  left: -20%;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(203, 246, 250, 0.9);
+  animation: water-wave 2.2s ease-in-out infinite;
+}
+
+.tank-level-line {
+  position: absolute;
+  right: -18px;
+  left: -18px;
+  bottom: 50%;
+  border-top: 1px dashed rgba(36, 116, 95, 0.38);
+}
+
+.process-level-value {
+  color: var(--accent-dark);
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.diagram-process {
+  cursor: pointer;
+}
+
+.diagram-process:hover rect,
+.diagram-process:focus rect {
+  fill: #edf5ef;
+  stroke: var(--accent);
+}
+
+@keyframes water-wave {
+  0%, 100% { transform: translateX(-3%); }
+  50% { transform: translateX(3%); }
 }

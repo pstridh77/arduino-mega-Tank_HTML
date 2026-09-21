@@ -3,24 +3,247 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Arduino LED-kontroll</title>
+  <title>Arduino kontrollpanel</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
-    <h1>Arduino LED</h1>
-    <p>Anslut till Arduino Mega via USB och styr den inbyggda LED:en.</p>
+    <h1>Nivåtank</h1>
+    <p>Anslut till Arduino Mega via USB och styr motor och nivåreglering.</p>
 
     <div class="controls">
       <button id="connectButton" type="button">Anslut Arduino</button>
 
-      <div class="switch-row">
-        <label for="ledSwitch">Inbyggd LED</label>
-        <label class="switch" aria-label="Styr inbyggd LED">
-          <input id="ledSwitch" type="checkbox" disabled>
-          <span class="slider"></span>
-        </label>
-      </div>
+      <dialog id="regulatorDialog" aria-labelledby="controlModeTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="controlModeTitle">Regulatorinställningar</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng regulatorinställningar">Stäng</button>
+          </div>
+          <label for="controlMode">Välj reglering</label>
+          <select id="controlMode" disabled>
+            <option value="off" selected>Off</option>
+            <option value="manual">Manuell</option>
+            <option value="on-off">On/Off-regulator</option>
+            <option value="p">P-regulator</option>
+            <option value="pi">PI-regulator</option>
+          </select>
+          <button id="openSignalExplanationButton" type="button" disabled>Visa styrsignalens beräkning</button>
+          <div id="onOffSettings" class="mode-settings" hidden>
+            <label for="onOffHysteresis">Hysteres från önskad nivå</label>
+            <div class="setting-control">
+              <input id="onOffHysteresis" type="number" min="0" max="250" step="1" value="10" disabled>
+              <span>mm</span>
+            </div>
+            <label for="onOffPwm">Pumpens effekt</label>
+            <div class="setting-control">
+              <input id="onOffPwm" type="number" min="0" max="255" step="1" value="180" disabled>
+              <span>PWM</span>
+            </div>
+            <button id="sendOnOffSettingsButton" type="button" disabled>Ställ in On/Off</button>
+          </div>
+          <div id="pSettings" class="mode-settings" hidden>
+            <label for="pGain">Förstärkning K</label>
+            <div class="setting-control">
+              <input id="pGain" type="number" min="0" max="10" step="0.2" value="1.0" disabled>
+              <span>K</span>
+            </div>
+            <button id="sendPSettingsButton" type="button" disabled>Ställ in P-Del</button>
+          </div>
+          <div id="piSettings" class="mode-settings" hidden>
+            <label for="piIntegralGain">Integralförstärkning Ki</label>
+            <div class="setting-control">
+              <input id="piIntegralGain" type="number" min="0" max="2" step="0.05" value="0.1" disabled>
+              <span>Ki</span>
+            </div>
+            <button id="sendPiSettingsButton" type="button" disabled>Ställ in I-Del</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="signalExplanationDialog" aria-labelledby="signalExplanationTitle">
+        <form method="dialog" class="regulator-dialog-content signal-explanation">
+          <div class="dialog-heading">
+            <h2 id="signalExplanationTitle">Så räknas styrsignalen ut</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng styrsignalens beräkning">Stäng</button>
+          </div>
+          <p id="signalExplanationText">Välj en regulator för att se beräkningen.</p>
+          <div class="signal-facts">
+            <div><span>Börvärde</span><output id="explanationDesired">-- mm</output></div>
+            <div><span>Mätvärde</span><output id="explanationMeasured">-- mm</output></div>
+            <div class="manual-error-display"><span>Fel</span><output id="explanationError">-- mm</output></div>
+            <div><span>Styrsignal</span><output id="explanationOutput">-- PWM / --%</output></div>
+            <div id="explanationPFact"><span>P-del</span><output id="explanationPContribution">0 PWM</output></div>
+            <div id="explanationIFact"><span>I-del</span><output id="explanationIContribution">0 PWM</output></div>
+          </div>
+          <div id="signalMethod" class="signal-method" aria-live="polite">Beräkning: --</div>
+          <div id="signalFormula" class="signal-formula" aria-live="polite">--</div>
+        </form>
+      </dialog>
+
+      <dialog id="motorDialog" aria-labelledby="motorTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="motorTitle">Motorparametrar</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng motorparametrar">Stäng</button>
+          </div>
+          <div class="section-heading">
+            <h2>Motorhastighet</h2>
+            <div class="motor-values">
+              <output id="motorPwmPercent">0%</output>
+              <output id="motorPwmValue">0 PWM</output>
+            </div>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="setpointDialog" aria-labelledby="setpointTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="setpointTitle">Börvärdesinställning</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng börvärdesinställning">Stäng</button>
+          </div>
+          <label for="desiredLevel">Önskad nivå</label>
+          <div class="setpoint-control">
+            <input id="desiredLevel" type="number" min="0" max="500" step="1" value="250" disabled>
+            <span>mm</span>
+            <button id="sendSetpointButton" type="button" disabled>Ställ in</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="sensorDialog" aria-labelledby="sensorTitle">
+        <form method="dialog" class="regulator-dialog-content sensor-explanation">
+          <div class="dialog-heading">
+            <h2 id="sensorTitle">Så räknas nivån ut</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng nivåberäkning">Stäng</button>
+          </div>
+          <p>Arduino läser spänningen på nivågivaren via Analog In A4 och räknar om den till avstånd och tanknivå.</p>
+          <div class="sensor-steps">
+            <div><span>Spänning</span><output id="sensorVoltageValue">-- V</output></div>
+            <div><span>Analog In A4</span><output id="sensorAdcValue">-- / 1023</output></div>
+            <div><span>Uppmätt avstånd</span><output id="sensorDistanceValue">-- mm</output></div>
+            <div><span>Tanknivå</span><output id="sensorLevelValue">-- mm</output></div>
+          </div>
+          <div class="signal-method">ADC -> spänning -> avstånd -> tanknivå</div>
+          <div id="sensorFormula" class="signal-formula">--</div>
+        </form>
+      </dialog>
+
+      <dialog id="processDialog" aria-labelledby="processTitle">
+        <form method="dialog" class="regulator-dialog-content process-explanation">
+          <div class="dialog-heading">
+            <h2 id="processTitle">Tanknivå</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng tankvisning">Stäng</button>
+          </div>
+          <div class="tank-view" aria-label="Animerad tank med höjd 500 millimeter">
+            <div class="tank-scale"><span>500 mm</span><span>250 mm</span><span>0 mm</span></div>
+            <div class="tank-pipe">
+              <div id="tankWater" class="tank-water"></div>
+              <div class="tank-level-line"></div>
+            </div>
+          </div>
+          <output id="processLevelValue" class="process-level-value">-- mm</output>
+          <p>Vattnet fylls från botten. Tankens höjd är 500 mm.</p>
+        </form>
+      </dialog>
+
+      <figure class="control-diagram" aria-labelledby="diagramTitle">
+        <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
+        <svg id="controlDiagram" viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
+          <desc id="diagramDescription">Börvärdet jämförs med ärvärdet. Reglerfelet behandlas av regulatorn som skickar en styrsignal till processen. En givare mäter processen och återkopplar ärvärdet.</desc>
+          <defs>
+            <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z"></path>
+            </marker>
+          </defs>
+
+          <g id="diagramSetpoint" class="diagram-box diagram-setpoint" role="button" tabindex="0" aria-label="Öppna börvärdesinställning" aria-controls="setpointDialog">
+            <rect x="24" y="34" width="150" height="68" rx="6"></rect>
+            <text x="99" y="59" text-anchor="middle">Börvärde</text>
+            <text id="diagramDesired" x="99" y="83" text-anchor="middle">-- mm</text>
+          </g>
+          <line class="diagram-line" x1="174" y1="68" x2="252" y2="68" marker-end="url(#arrowHead)"></line>
+
+          <g class="diagram-sum">
+            <circle cx="278" cy="68" r="26"></circle>
+            <text x="269" y="62" text-anchor="middle">+</text>
+            <text x="269" y="82" text-anchor="middle">-</text>
+          </g>
+          <line class="diagram-line" x1="304" y1="68" x2="366" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="335" y="53" text-anchor="middle">Reglerfel</text>
+          <text id="diagramError" class="diagram-value manual-error-display" x="335" y="91" text-anchor="middle">-- mm</text>
+
+          <g id="diagramRegulator" class="diagram-box diagram-regulator" role="button" tabindex="0" aria-label="Välj regulator" aria-controls="controlMode">
+            <rect x="366" y="34" width="160" height="68" rx="6"></rect>
+            <text x="446" y="62" text-anchor="middle">Regulator</text>
+            <text id="diagramMode" x="446" y="84" text-anchor="middle">Off</text>
+          </g>
+          <line class="diagram-line" x1="526" y1="68" x2="588" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="557" y="53" text-anchor="middle">Styrsignal</text>
+          <text id="diagramControlSignal" class="diagram-value diagram-interactive" x="557" y="91" text-anchor="middle" role="button" tabindex="0" aria-label="Visa beräkning av styrsignalen">0%</text>
+
+          <g id="diagramActuator" class="diagram-box diagram-actuator" role="button" tabindex="0" aria-label="Öppna motorparametrar" aria-controls="motorDialog">
+            <rect x="588" y="34" width="100" height="68" rx="6"></rect>
+            <text x="638" y="59" text-anchor="middle">Styrdon</text>
+          </g>
+          <line class="diagram-line" x1="688" y1="68" x2="720" y2="68" marker-end="url(#arrowHead)"></line>
+          <g id="diagramProcess" class="diagram-box diagram-process" role="button" tabindex="0" aria-label="Öppna tankvisning" aria-controls="processDialog">
+            <rect x="720" y="34" width="150" height="68" rx="6"></rect>
+            <text x="795" y="62" text-anchor="middle">Process</text>
+          </g>
+          <line class="diagram-line" x1="870" y1="68" x2="1060" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="965" y="53" text-anchor="middle">Reglerad storhet</text>
+          <text id="diagramOutput" class="diagram-value" x="965" y="91" text-anchor="middle">-- mm</text>
+
+          <line class="diagram-line" x1="920" y1="68" x2="920" y2="190"></line>
+          <line class="diagram-line" x1="920" y1="190" x2="665" y2="190" marker-end="url(#arrowHead)"></line>
+          <g class="diagram-box">
+            <rect x="465" y="156" width="200" height="68" rx="6"></rect>
+            <text x="565" y="184" text-anchor="middle">Givare</text>
+            <text id="diagramSensor" class="diagram-interactive" x="565" y="206" text-anchor="middle" role="button" tabindex="0" aria-label="Visa nivåberäkning">-- mm</text>
+          </g>
+          <line class="diagram-line diagram-feedback" x1="465" y1="190" x2="278" y2="190"></line>
+          <line class="diagram-line diagram-feedback" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label diagram-feedback" x="384" y="181" text-anchor="middle">Ärvärde</text>
+          <text id="diagramFeedback" class="diagram-value diagram-feedback" x="384" y="214" text-anchor="middle">-- mm</text>
+        </svg>
+      </figure>
+
+      <section class="panel-section" aria-labelledby="levelTitle">
+        <h2 id="levelTitle">Nivåreglering</h2>
+        <div class="level-values">
+          <div class="level-reading measured">
+            <span>Uppmätt</span>
+            <div><output id="measuredLevel" aria-live="polite">--</output> mm</div>
+          </div>
+          <div class="level-reading desired">
+            <span>Önskad</span>
+            <div><output id="desiredLevelDisplay">--</output> mm</div>
+          </div>
+          <div class="level-reading error manual-error-display">
+            <span>Fel</span>
+            <div><output id="levelError" aria-live="polite">--</output> mm</div>
+          </div>
+        </div>
+        <div class="chart-toolbar">
+          <div class="chart-legend" aria-label="Förklaring till grafen">
+            <span><i class="measured"></i>Uppmätt</span>
+            <span><i class="desired"></i>Önskad</span>
+          </div>
+          <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
+        </div>
+        <div class="chart-layout">
+          <div class="chart-card level-chart">
+            <div class="chart-card-heading">Uppmätt / Önskad</div>
+            <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
+          </div>
+          <div class="chart-card error-panel manual-error-display" aria-label="Reglerfel">
+            <div class="chart-card-heading">Fel</div>
+            <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
+          </div>
+        </div>
+      </section>
 
       <p id="status" class="status">Inte ansluten.</p>
     </div>
@@ -28,25 +251,528 @@
 
   <script>
     const connectButton = document.querySelector("#connectButton");
-    const ledSwitch = document.querySelector("#ledSwitch");
+    const motorPwmValue = document.querySelector("#motorPwmValue");
+    const controlMode = document.querySelector("#controlMode");
+    const onOffSettings = document.querySelector("#onOffSettings");
+    const onOffHysteresis = document.querySelector("#onOffHysteresis");
+    const onOffPwm = document.querySelector("#onOffPwm");
+    const sendOnOffSettingsButton = document.querySelector("#sendOnOffSettingsButton");
+    const pSettings = document.querySelector("#pSettings");
+    const pGain = document.querySelector("#pGain");
+    const sendPSettingsButton = document.querySelector("#sendPSettingsButton");
+    const piSettings = document.querySelector("#piSettings");
+    const piIntegralGain = document.querySelector("#piIntegralGain");
+    const sendPiSettingsButton = document.querySelector("#sendPiSettingsButton");
+    const measuredLevel = document.querySelector("#measuredLevel");
+    const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
+    const levelError = document.querySelector("#levelError");
+    const diagramDesired = document.querySelector("#diagramDesired");
+    const diagramError = document.querySelector("#diagramError");
+    const diagramRegulator = document.querySelector("#diagramRegulator");
+    const regulatorDialog = document.querySelector("#regulatorDialog");
+    const diagramActuator = document.querySelector("#diagramActuator");
+    const motorDialog = document.querySelector("#motorDialog");
+    const diagramSetpoint = document.querySelector("#diagramSetpoint");
+    const setpointDialog = document.querySelector("#setpointDialog");
+    const diagramMode = document.querySelector("#diagramMode");
+    const controlDiagram = document.querySelector("#controlDiagram");
+    const feedbackElements = controlDiagram.querySelectorAll(".diagram-feedback");
+    const diagramControlSignal = document.querySelector("#diagramControlSignal");
+    const openSignalExplanationButton = document.querySelector("#openSignalExplanationButton");
+    const signalExplanationDialog = document.querySelector("#signalExplanationDialog");
+    const signalExplanationText = document.querySelector("#signalExplanationText");
+    const explanationDesired = document.querySelector("#explanationDesired");
+    const explanationMeasured = document.querySelector("#explanationMeasured");
+    const explanationError = document.querySelector("#explanationError");
+    const explanationOutput = document.querySelector("#explanationOutput");
+    const explanationPContribution = document.querySelector("#explanationPContribution");
+    const explanationIContribution = document.querySelector("#explanationIContribution");
+    const explanationPFact = document.querySelector("#explanationPFact");
+    const explanationIFact = document.querySelector("#explanationIFact");
+    const signalMethod = document.querySelector("#signalMethod");
+    const signalFormula = document.querySelector("#signalFormula");
+    const motorPwmPercent = document.querySelector("#motorPwmPercent");
+    const diagramOutput = document.querySelector("#diagramOutput");
+    const diagramSensor = document.querySelector("#diagramSensor");
+    const sensorDialog = document.querySelector("#sensorDialog");
+    const diagramProcess = document.querySelector("#diagramProcess");
+    const processDialog = document.querySelector("#processDialog");
+    const tankWater = document.querySelector("#tankWater");
+    const processLevelValue = document.querySelector("#processLevelValue");
+    const sensorAdcValue = document.querySelector("#sensorAdcValue");
+    const sensorVoltageValue = document.querySelector("#sensorVoltageValue");
+    const sensorDistanceValue = document.querySelector("#sensorDistanceValue");
+    const sensorLevelValue = document.querySelector("#sensorLevelValue");
+    const sensorFormula = document.querySelector("#sensorFormula");
+    const diagramFeedback = document.querySelector("#diagramFeedback");
+    const desiredLevel = document.querySelector("#desiredLevel");
+    const sendSetpointButton = document.querySelector("#sendSetpointButton");
+    const levelChart = document.querySelector("#levelChart");
+    const levelChartContext = levelChart.getContext("2d");
+    const errorChart = document.querySelector("#errorChart");
+    const errorChartContext = errorChart.getContext("2d");
+    const toggleChartButton = document.querySelector("#toggleChartButton");
     const statusText = document.querySelector("#status");
+
+    const serialControls = [
+      controlMode,
+      openSignalExplanationButton,
+      onOffHysteresis,
+      onOffPwm,
+      sendOnOffSettingsButton,
+      pGain,
+      sendPSettingsButton,
+      piIntegralGain,
+      sendPiSettingsButton,
+      desiredLevel,
+      sendSetpointButton,
+    ];
 
     let port;
     let writer;
+    let chartPaused = false;
+    let pausedChartTime = 0;
+    let latestMeasured = null;
+    let latestDesired = null;
+    let latestError = null;
+    let latestOutputPwm = 0;
+    let latestPContribution = 0;
+    let latestIContribution = 0;
+    let latestProcessLevel = null;
+    let latestSensorAdc = null;
+    let latestSensorVoltage = null;
+    let latestSensorDistance = null;
+    const levelHistory = [];
+    const chartTimeSpanMs = 60000;
+    const chartMaxLevel = 500;
+    const chartMaxError = 250;
+
+    function drawLevelChart() {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = levelChart.clientWidth;
+      const height = levelChart.clientHeight;
+      const requiredWidth = Math.round(width * pixelRatio);
+      const requiredHeight = Math.round(height * pixelRatio);
+
+      if (levelChart.width !== requiredWidth || levelChart.height !== requiredHeight) {
+        levelChart.width = requiredWidth;
+        levelChart.height = requiredHeight;
+      }
+
+      levelChartContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      levelChartContext.clearRect(0, 0, width, height);
+
+      const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
+      const plotWidth = plot.right - plot.left;
+      const plotHeight = plot.bottom - plot.top;
+      const now = chartPaused ? pausedChartTime : performance.now();
+
+      levelChartContext.font = "11px Segoe UI, sans-serif";
+      levelChartContext.lineWidth = 1;
+      levelChartContext.textBaseline = "middle";
+
+      for (let level = 0; level <= chartMaxLevel; level += 100) {
+        const y = plot.bottom - (level / chartMaxLevel) * plotHeight;
+        levelChartContext.strokeStyle = "#ded5c3";
+        levelChartContext.beginPath();
+        levelChartContext.moveTo(plot.left, y);
+        levelChartContext.lineTo(plot.right, y);
+        levelChartContext.stroke();
+        levelChartContext.fillStyle = "#6b665b";
+        levelChartContext.textAlign = "right";
+        levelChartContext.fillText(String(level), plot.left - 7, y);
+      }
+
+      for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
+        const x = plot.right - (secondsAgo / 60) * plotWidth;
+        levelChartContext.strokeStyle = "#ded5c3";
+        levelChartContext.beginPath();
+        levelChartContext.moveTo(x, plot.top);
+        levelChartContext.lineTo(x, plot.bottom);
+        levelChartContext.stroke();
+      }
+
+      levelChartContext.textBaseline = "alphabetic";
+      levelChartContext.fillStyle = "#6b665b";
+      levelChartContext.textAlign = "left";
+      levelChartContext.fillText("-60 s", plot.left, height - 5);
+      levelChartContext.textAlign = "right";
+      levelChartContext.fillText("nu", plot.right, height - 5);
+
+      if (levelHistory.length > 0) {
+        levelChartContext.save();
+        levelChartContext.beginPath();
+        levelChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
+        levelChartContext.clip();
+        levelChartContext.lineWidth = 2;
+        levelChartContext.lineJoin = "round";
+
+        function drawSeries(property, color, minimum, maximum) {
+          levelChartContext.strokeStyle = color;
+          levelChartContext.beginPath();
+
+          levelHistory.forEach((sample, index) => {
+            const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
+            const boundedValue = Math.min(maximum, Math.max(minimum, sample[property]));
+            const y = plot.bottom - ((boundedValue - minimum) / (maximum - minimum)) * plotHeight;
+
+            if (index === 0) {
+              levelChartContext.moveTo(x, y);
+            } else {
+              levelChartContext.lineTo(x, y);
+            }
+          });
+
+          levelChartContext.stroke();
+        }
+
+        drawSeries("measured", "#24745f", 0, chartMaxLevel);
+        drawSeries("desired", "#2463a0", 0, chartMaxLevel);
+        levelChartContext.restore();
+      }
+
+      drawErrorChart(now);
+
+      requestAnimationFrame(drawLevelChart);
+    }
+
+    function drawErrorChart(now) {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = errorChart.clientWidth;
+      const height = errorChart.clientHeight;
+      const requiredWidth = Math.round(width * pixelRatio);
+      const requiredHeight = Math.round(height * pixelRatio);
+
+      if (errorChart.width !== requiredWidth || errorChart.height !== requiredHeight) {
+        errorChart.width = requiredWidth;
+        errorChart.height = requiredHeight;
+      }
+
+      errorChartContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      errorChartContext.clearRect(0, 0, width, height);
+
+      const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
+      const plotWidth = plot.right - plot.left;
+      const plotHeight = plot.bottom - plot.top;
+      const errorLimit = chartMaxError;
+
+      errorChartContext.font = "11px Segoe UI, sans-serif";
+      errorChartContext.textBaseline = "middle";
+      errorChartContext.textAlign = "right";
+
+      const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
+      for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
+        const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
+        errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
+        errorChartContext.beginPath();
+        errorChartContext.moveTo(plot.left, y);
+        errorChartContext.lineTo(plot.right, y);
+        errorChartContext.stroke();
+        errorChartContext.fillStyle = "#6b665b";
+        errorChartContext.fillText(String(value), plot.left - 7, y);
+      }
+
+      for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
+        const x = plot.right - (secondsAgo / 60) * plotWidth;
+        errorChartContext.strokeStyle = "#ded5c3";
+        errorChartContext.beginPath();
+        errorChartContext.moveTo(x, plot.top);
+        errorChartContext.lineTo(x, plot.bottom);
+        errorChartContext.stroke();
+      }
+
+      errorChartContext.textBaseline = "alphabetic";
+      errorChartContext.textAlign = "left";
+      errorChartContext.fillText("-60 s", plot.left, height - 5);
+      errorChartContext.textAlign = "right";
+      errorChartContext.fillText("nu", plot.right, height - 5);
+
+      if (levelHistory.length === 0) {
+        return;
+      }
+
+      errorChartContext.save();
+      errorChartContext.beginPath();
+      errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
+      errorChartContext.clip();
+      errorChartContext.strokeStyle = "#b4492f";
+      errorChartContext.lineWidth = 2;
+      errorChartContext.lineJoin = "round";
+      errorChartContext.beginPath();
+
+      levelHistory.forEach((sample, index) => {
+        const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
+        const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
+        const y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+
+        if (index === 0) {
+          errorChartContext.moveTo(x, y);
+        } else {
+          errorChartContext.lineTo(x, y);
+        }
+      });
+
+      errorChartContext.stroke();
+      errorChartContext.restore();
+    }
+
+    drawLevelChart();
 
     function setStatus(message, isError = false) {
       statusText.textContent = message;
       statusText.classList.toggle("error", isError);
     }
 
-    async function sendLedState(isOn) {
+    async function sendCommand(command) {
       if (!writer) {
         return;
       }
 
-      const command = isOn ? "1" : "0";
-      await writer.write(new TextEncoder().encode(command));
-      setStatus(isOn ? "LED tänd." : "LED släckt.");
+      await writer.write(new TextEncoder().encode(`${command}\n`));
+    }
+
+    function handleSerialLine(line) {
+      if (line === "READY") {
+        sendCommand("LCD:FMTS|Ready").catch((error) => {
+          setStatus(`Kunde inte bekräfta webbanslutningen: ${error.message}`, true);
+        });
+        sendCommand(`MODE:${controlMode.value}`).catch((error) => {
+          setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+        });
+        return;
+      }
+
+      if (!line.startsWith("LEVEL:")) {
+        if (line.startsWith("SENSOR:")) {
+          const sensorValues = line.substring(7).split("|").map(Number);
+
+          if (sensorValues.length === 4 && sensorValues.every(Number.isFinite)) {
+            latestSensorAdc = sensorValues[0];
+            latestSensorVoltage = sensorValues[1];
+            latestSensorDistance = sensorValues[2];
+            updateSensorExplanation(sensorValues[3]);
+          }
+        }
+
+        if (line.startsWith("OUTPUT:")) {
+          const outputValues = line.substring(7).split("|").map(Number);
+          const outputPwm = outputValues[0];
+
+          if (Number.isInteger(outputPwm) && outputPwm >= 0 && outputPwm <= 255) {
+            latestPContribution = Number.isFinite(outputValues[1]) ? outputValues[1] : 0;
+            latestIContribution = Number.isFinite(outputValues[2]) ? outputValues[2] : 0;
+            latestOutputPwm = outputPwm;
+            updateMotorDisplay(outputPwm);
+            updateSignalExplanation();
+          }
+        }
+
+        return;
+      }
+
+      const values = line.substring(6).split("|").map(Number);
+      if (values.length === 1 && Number.isFinite(values[0])) {
+        const measured = values[0];
+        const desired = Number(desiredLevel.value);
+        const error = desired - measured;
+
+        updateLevelValues(measured, desired, error);
+      } else if (values.length === 3 && values.every(Number.isFinite)) {
+        updateLevelValues(values[0], values[1], values[2]);
+      }
+    }
+
+    function updateLevelValues(measured, desired, error) {
+      latestMeasured = measured;
+      latestProcessLevel = measured;
+      latestDesired = desired;
+      latestError = error;
+        measuredLevel.value = measured.toFixed(1);
+        desiredLevelDisplay.value = desired.toFixed(1);
+        levelError.value = error.toFixed(1);
+      diagramDesired.textContent = `${desired.toFixed(1)} mm`;
+      diagramError.textContent = `${error.toFixed(1)} mm`;
+      diagramOutput.textContent = `${measured.toFixed(1)} mm`;
+      diagramSensor.textContent = `${measured.toFixed(1)} mm`;
+      updateProcessTank(measured);
+      diagramFeedback.textContent = `${measured.toFixed(1)} mm`;
+      updateSignalExplanation();
+
+        if (chartPaused) {
+          return;
+        }
+
+        const now = performance.now();
+        levelHistory.push({ time: now, measured, desired, error });
+
+        while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
+          levelHistory.shift();
+        }
+    }
+
+    async function readSerialMessages() {
+      const reader = port.readable.getReader();
+      const decoder = new TextDecoder();
+      let receivedText = "";
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          receivedText += decoder.decode(value, { stream: true });
+          const lines = receivedText.split("\n");
+          receivedText = lines.pop();
+          lines.forEach((line) => handleSerialLine(line.trim()));
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+
+    function updateMotorDisplay(pwm) {
+      const percent = Math.round((Number(pwm) / 255) * 100);
+      latestOutputPwm = Number(pwm);
+      motorPwmValue.value = `${pwm} PWM`;
+      motorPwmPercent.value = `${percent}%`;
+      diagramControlSignal.textContent = `${percent}%`;
+      updateSignalExplanation();
+    }
+
+    function updateProcessTank(level) {
+      const boundedLevel = Math.max(0, Math.min(500, Number(level)));
+      const percentage = Number.isFinite(boundedLevel) ? (boundedLevel / 500) * 100 : 0;
+      tankWater.style.height = `${percentage}%`;
+      processLevelValue.textContent = Number.isFinite(boundedLevel) ? `${boundedLevel.toFixed(1)} mm` : "-- mm";
+    }
+
+    function updateSensorExplanation(level) {
+      sensorAdcValue.textContent = latestSensorAdc === null ? "-- / 1023" : `${latestSensorAdc} / 1023`;
+      sensorVoltageValue.textContent = latestSensorVoltage === null ? "-- V" : `${latestSensorVoltage.toFixed(3)} V`;
+      sensorDistanceValue.textContent = latestSensorDistance === null ? "-- mm" : `${latestSensorDistance.toFixed(1)} mm`;
+      sensorLevelValue.textContent = `${level.toFixed(1)} mm`;
+      sensorFormula.textContent = latestSensorVoltage === null
+        ? "--"
+        : `${latestSensorVoltage.toFixed(3)} V -> ${latestSensorDistance.toFixed(1)} mm avstånd -> ${level.toFixed(1)} mm tanknivå`;
+    }
+
+    function updateSignalExplanation() {
+      const desired = latestDesired ?? Number(desiredLevel.value);
+      const measured = latestMeasured;
+      const error = latestError;
+      const outputPwm = latestOutputPwm;
+      const outputPercent = Math.round((outputPwm / 255) * 100);
+      const mode = controlMode.value;
+      const gain = Number(pGain.value);
+
+      explanationDesired.textContent = Number.isFinite(desired) ? `${desired.toFixed(1)} mm` : "-- mm";
+      explanationMeasured.textContent = Number.isFinite(measured) ? `${measured.toFixed(1)} mm` : "-- mm";
+      explanationError.textContent = Number.isFinite(error) ? `${error.toFixed(1)} mm` : "-- mm";
+      explanationOutput.textContent = `${outputPwm} PWM / ${outputPercent}%`;
+      explanationPContribution.textContent = `${latestPContribution.toFixed(1)} PWM`;
+      explanationIContribution.textContent = `${latestIContribution.toFixed(1)} PWM`;
+      explanationPFact.hidden = mode !== "p" && mode !== "pi";
+      explanationIFact.hidden = mode !== "pi";
+
+      if (mode === "manual") {
+        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen direkt från potentiometern.";
+        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255.";
+        signalFormula.textContent = `Potentiometer -> ${outputPwm} PWM -> ${outputPercent}%`;
+      } else if (mode === "off") {
+        signalExplanationText.textContent = "När regulatorn är avstängd skickas ingen effekt till pumpen.";
+        signalMethod.textContent = "Beräkning: regulatorn är avstängd, därför blir signalen 0.";
+        signalFormula.textContent = "Regulator OFF -> 0 PWM -> 0%";
+      } else if (mode === "on-off") {
+        signalExplanationText.textContent = "On/Off-regulatorn väljer mellan avstängd pump och inställd pumpeffekt utifrån hysteresbandet.";
+        signalMethod.textContent = "Beräkning: jämför fel mot hysteresbandet och välj 0 eller inställd pumpeffekt.";
+        signalFormula.textContent = `On/Off -> ${outputPwm} PWM -> ${outputPercent}%`;
+      } else if (mode === "p") {
+        const basePwm = 55;
+        const calculatedPwm = Number.isFinite(error) ? Math.max(0, Math.min(255, Math.trunc(basePwm + error * gain))) : null;
+        signalExplanationText.textContent = "P-regulatorn lägger till ett grundpådrag och ökar signalen proportionellt mot felet.";
+        signalMethod.textContent = "Beräkning: PWM = grundpådrag + (fel x K).";
+        signalFormula.textContent = Number.isFinite(error)
+          ? `55 + (${error.toFixed(1)} x ${gain.toFixed(1)}) = ${calculatedPwm} PWM -> ${outputPercent}%`
+          : "55 + (fel x K) = PWM";
+      } else {
+        signalExplanationText.textContent = "PI-regulatorn använder både det aktuella felet och den ackumulerade integraldelen.";
+        signalMethod.textContent = "Beräkning: PWM = grundpådrag + P-del + integraldel.";
+        signalFormula.textContent = Number.isFinite(error)
+          ? `55 + P(${latestPContribution.toFixed(1)}) + I(${latestIContribution.toFixed(1)}) = ${outputPwm} PWM -> ${outputPercent}%`
+          : "PI: grundpådrag + P-del + integraldel = PWM";
+      }
+    }
+
+    async function sendDesiredLevel() {
+      if (!desiredLevel.reportValidity()) {
+        return;
+      }
+
+      desiredLevelDisplay.value = Number(desiredLevel.value).toFixed(1);
+      diagramDesired.textContent = `${Number(desiredLevel.value).toFixed(1)} mm`;
+      await sendCommand(`SETPOINT:${desiredLevel.value}`);
+      setStatus(`Önskad nivå skickad: ${desiredLevel.value} mm.`);
+    }
+
+    async function sendControlMode() {
+      await sendCommand(`MODE:${controlMode.value}`);
+      setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
+    }
+
+    function updateOnOffSettingsVisibility() {
+      onOffSettings.hidden = controlMode.value !== "on-off";
+    }
+
+    function updateDiagramFeedbackVisibility() {
+      const openLoopMode = controlMode.value === "manual";
+      controlDiagram.classList.toggle("open-loop", openLoopMode);
+      document.body.classList.toggle("manual-mode", openLoopMode);
+      feedbackElements.forEach((element) => {
+        element.style.visibility = openLoopMode ? "hidden" : "visible";
+      });
+    }
+
+    async function sendOnOffSettings() {
+      if (!onOffHysteresis.reportValidity() || !onOffPwm.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`ONOFF:${onOffHysteresis.value}|${onOffPwm.value}`);
+      setStatus("On/Off-inställningar skickade.");
+    }
+
+    function updatePSettingsVisibility() {
+      pSettings.hidden = controlMode.value !== "p";
+    }
+
+    async function sendPSettings() {
+      if (!pGain.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`PGAIN:${pGain.value}`);
+      setStatus(`P-regulatorns K är ${Number(pGain.value).toFixed(1)}.`);
+    }
+
+    function updatePiSettingsVisibility() {
+      piSettings.hidden = controlMode.value !== "pi";
+    }
+
+    function updateRegulatorSettingsVisibility() {
+      onOffSettings.hidden = controlMode.value !== "on-off";
+      pSettings.hidden = controlMode.value !== "p" && controlMode.value !== "pi";
+      piSettings.hidden = controlMode.value !== "pi";
+    }
+
+    async function sendPiSettings() {
+      if (!piIntegralGain.reportValidity()) {
+        return;
+      }
+
+      await sendCommand(`PIGAIN:${piIntegralGain.value}`);
+      setStatus(`PI-regulatorns Ki är ${Number(piIntegralGain.value).toFixed(2)}.`);
     }
 
     connectButton.addEventListener("click", async () => {
@@ -59,7 +785,18 @@
         port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
         writer = port.writable.getWriter();
-        ledSwitch.disabled = false;
+        readSerialMessages().catch((error) => {
+          setStatus(`Kunde inte läsa mätvärdet: ${error.message}`, true);
+        });
+        await sendCommand("LCD:FMTS|Ready");
+        setTimeout(() => {
+          sendCommand("LCD:FMTS|Ready").catch((error) => {
+            setStatus(`Kunde inte uppdatera LCD-status: ${error.message}`, true);
+          });
+        }, 1500);
+        serialControls.forEach((control) => {
+          control.disabled = false;
+        });
         connectButton.disabled = true;
         setStatus("Ansluten. Vänta någon sekund efter anslutning om kortet startar om.");
       } catch (error) {
@@ -67,17 +804,179 @@
       }
     });
 
-    ledSwitch.addEventListener("change", async () => {
-      ledSwitch.disabled = true;
-
+    controlMode.addEventListener("change", async () => {
+      updateOnOffSettingsVisibility();
+      updatePSettingsVisibility();
+      updatePiSettingsVisibility();
+      updateRegulatorSettingsVisibility();
+      updateDiagramFeedbackVisibility();
+      diagramMode.textContent = controlMode.options[controlMode.selectedIndex].text;
+      updateSignalExplanation();
       try {
-        await sendLedState(ledSwitch.checked);
+        await sendControlMode();
       } catch (error) {
-        setStatus(`Kunde inte skicka kommando: ${error.message}`, true);
-      } finally {
-        ledSwitch.disabled = false;
+        setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
       }
     });
+
+    function openRegulatorControls() {
+      if (!regulatorDialog.open) {
+        regulatorDialog.showModal();
+      }
+
+      controlMode.focus();
+    }
+
+    diagramRegulator.addEventListener("click", openRegulatorControls);
+    diagramRegulator.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openRegulatorControls();
+      }
+    });
+
+    function openMotorControls() {
+      if (!motorDialog.open) {
+        motorDialog.showModal();
+      }
+    }
+
+    diagramActuator.addEventListener("click", openMotorControls);
+    diagramActuator.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openMotorControls();
+      }
+    });
+
+    function openSignalExplanation() {
+      updateSignalExplanation();
+      if (!signalExplanationDialog.open) {
+        signalExplanationDialog.showModal();
+      }
+    }
+
+    openSignalExplanationButton.addEventListener("click", openSignalExplanation);
+    diagramControlSignal.addEventListener("click", openSignalExplanation);
+    diagramControlSignal.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSignalExplanation();
+      }
+    });
+
+    function openSetpointControls() {
+      if (!setpointDialog.open) {
+        setpointDialog.showModal();
+      }
+
+      desiredLevel.focus();
+    }
+
+    diagramSetpoint.addEventListener("click", openSetpointControls);
+    diagramSetpoint.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSetpointControls();
+      }
+    });
+
+    function openSensorControls() {
+      if (!sensorDialog.open) {
+        sensorDialog.showModal();
+      }
+    }
+
+    diagramSensor.addEventListener("click", openSensorControls);
+    diagramSensor.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSensorControls();
+      }
+    });
+
+    function openProcessControls() {
+      updateProcessTank(latestProcessLevel ?? latestMeasured ?? 0);
+      if (!processDialog.open) {
+        processDialog.showModal();
+      }
+    }
+
+    diagramProcess.addEventListener("click", openProcessControls);
+    diagramProcess.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openProcessControls();
+      }
+    });
+
+    sendPiSettingsButton.addEventListener("click", async () => {
+      sendPiSettingsButton.disabled = true;
+
+      try {
+        await sendPiSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in PI-regulatorn: ${error.message}`, true);
+      } finally {
+        sendPiSettingsButton.disabled = false;
+      }
+    });
+
+    sendPSettingsButton.addEventListener("click", async () => {
+      sendPSettingsButton.disabled = true;
+
+      try {
+        await sendPSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in P-regulatorn: ${error.message}`, true);
+      } finally {
+        sendPSettingsButton.disabled = false;
+      }
+    });
+
+    sendOnOffSettingsButton.addEventListener("click", async () => {
+      sendOnOffSettingsButton.disabled = true;
+
+      try {
+        await sendOnOffSettings();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in On/Off-regulatorn: ${error.message}`, true);
+      } finally {
+        sendOnOffSettingsButton.disabled = false;
+      }
+    });
+
+    updateOnOffSettingsVisibility();
+    updatePSettingsVisibility();
+    updatePiSettingsVisibility();
+    updateRegulatorSettingsVisibility();
+    updateDiagramFeedbackVisibility();
+
+    toggleChartButton.addEventListener("click", () => {
+      chartPaused = !chartPaused;
+      toggleChartButton.setAttribute("aria-pressed", String(chartPaused));
+
+      if (chartPaused) {
+        pausedChartTime = performance.now();
+        toggleChartButton.textContent = "Återuppta graf";
+      } else {
+        levelHistory.length = 0;
+        toggleChartButton.textContent = "Pausa graf";
+      }
+    });
+
+    sendSetpointButton.addEventListener("click", async () => {
+      sendSetpointButton.disabled = true;
+
+      try {
+        await sendDesiredLevel();
+      } catch (error) {
+        setStatus(`Kunde inte ställa in önskad nivå: ${error.message}`, true);
+      } finally {
+        sendSetpointButton.disabled = false;
+      }
+    });
+
   </script>
 </body>
 </html>
