@@ -103,6 +103,24 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.motor-values {
+  display: grid;
+  gap: 2px;
+  color: var(--accent-dark);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.motor-values output:first-child {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.motor-values output:last-child {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 .dialog-close {
   min-height: 36px;
   padding: 0 12px;
@@ -143,7 +161,11 @@ dialog::backdrop {
 }
 
 .diagram-regulator:hover rect,
-.diagram-regulator:focus rect {
+.diagram-regulator:focus rect,
+.diagram-actuator:hover rect,
+.diagram-actuator:focus rect,
+.diagram-setpoint:hover rect,
+.diagram-setpoint:focus rect {
   fill: #edf5ef;
   stroke: var(--accent);
 }

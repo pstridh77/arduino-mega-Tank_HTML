@@ -14,22 +14,6 @@
     <div class="controls">
       <button id="connectButton" type="button">Anslut Arduino</button>
 
-      <div class="top-controls">
-        <section class="panel-section" aria-labelledby="motorTitle">
-        <div class="section-heading">
-          <h2 id="motorTitle">Motorhastighet</h2>
-          <output id="motorPwmValue" for="motorPwm">0</output>
-        </div>
-        <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
-        <div class="potentiometer-reading">
-          <span>Potentiometer A2</span>
-          <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
-          <span>PWM: <output id="potentiometerPwm">-- / 255</output></span>
-        </div>
-        </section>
-
-      </div>
-
       <dialog id="regulatorDialog" aria-labelledby="controlModeTitle">
         <form method="dialog" class="regulator-dialog-content">
           <div class="dialog-heading">
@@ -76,6 +60,43 @@
         </form>
       </dialog>
 
+      <dialog id="motorDialog" aria-labelledby="motorTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="motorTitle">Motorparametrar</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng motorparametrar">Stäng</button>
+          </div>
+          <div class="section-heading">
+            <h2>Motorhastighet</h2>
+            <div class="motor-values">
+              <output id="motorPwmPercent">0%</output>
+              <output id="motorPwmValue" for="motorPwm">0 PWM</output>
+            </div>
+          </div>
+          <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
+          <div class="potentiometer-reading">
+            <span>Potentiometer A2</span>
+            <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
+            <span>PWM: <output id="potentiometerPwm">-- / 255</output></span>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="setpointDialog" aria-labelledby="setpointTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="setpointTitle">Börvärdesinställning</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng börvärdesinställning">Stäng</button>
+          </div>
+          <label for="desiredLevel">Önskad nivå</label>
+          <div class="setpoint-control">
+            <input id="desiredLevel" type="number" min="0" max="500" step="1" value="250" disabled>
+            <span>mm</span>
+            <button id="sendSetpointButton" type="button" disabled>Ställ in</button>
+          </div>
+        </form>
+      </dialog>
+
       <figure class="control-diagram" aria-labelledby="diagramTitle">
         <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
         <svg viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
@@ -86,7 +107,7 @@
             </marker>
           </defs>
 
-          <g class="diagram-box diagram-setpoint">
+          <g id="diagramSetpoint" class="diagram-box diagram-setpoint" role="button" tabindex="0" aria-label="Öppna börvärdesinställning" aria-controls="setpointDialog">
             <rect x="24" y="34" width="150" height="68" rx="6"></rect>
             <text x="99" y="59" text-anchor="middle">Börvärde</text>
             <text id="diagramDesired" x="99" y="83" text-anchor="middle">-- mm</text>
@@ -109,18 +130,23 @@
           </g>
           <line class="diagram-line" x1="526" y1="68" x2="588" y2="68" marker-end="url(#arrowHead)"></line>
           <text class="diagram-label" x="557" y="53" text-anchor="middle">Styrsignal</text>
-          <text id="diagramPwm" class="diagram-value" x="557" y="91" text-anchor="middle">0 PWM</text>
+          <text id="diagramControlSignal" class="diagram-value" x="557" y="91" text-anchor="middle">0%</text>
 
-          <g class="diagram-box">
-            <rect x="588" y="34" width="190" height="68" rx="6"></rect>
-            <text x="683" y="59" text-anchor="middle">Styrdon / Process</text>
+          <g id="diagramActuator" class="diagram-box diagram-actuator" role="button" tabindex="0" aria-label="Öppna motorparametrar" aria-controls="motorDialog">
+            <rect x="588" y="34" width="100" height="68" rx="6"></rect>
+            <text x="638" y="59" text-anchor="middle">Styrdon</text>
           </g>
-          <line class="diagram-line" x1="778" y1="68" x2="1060" y2="68" marker-end="url(#arrowHead)"></line>
-          <text class="diagram-label" x="920" y="53" text-anchor="middle">Reglerad storhet</text>
-          <text id="diagramOutput" class="diagram-value" x="920" y="91" text-anchor="middle">-- mm</text>
+          <line class="diagram-line" x1="688" y1="68" x2="720" y2="68" marker-end="url(#arrowHead)"></line>
+          <g class="diagram-box">
+            <rect x="720" y="34" width="150" height="68" rx="6"></rect>
+            <text x="795" y="62" text-anchor="middle">Process</text>
+          </g>
+          <line class="diagram-line" x1="870" y1="68" x2="1060" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="965" y="53" text-anchor="middle">Reglerad storhet</text>
+          <text id="diagramOutput" class="diagram-value" x="965" y="91" text-anchor="middle">-- mm</text>
 
-          <line class="diagram-line" x1="850" y1="68" x2="850" y2="190"></line>
-          <line class="diagram-line" x1="850" y1="190" x2="665" y2="190" marker-end="url(#arrowHead)"></line>
+          <line class="diagram-line" x1="920" y1="68" x2="920" y2="190"></line>
+          <line class="diagram-line" x1="920" y1="190" x2="665" y2="190" marker-end="url(#arrowHead)"></line>
           <g class="diagram-box">
             <rect x="465" y="156" width="200" height="68" rx="6"></rect>
             <text x="565" y="184" text-anchor="middle">Givare</text>
@@ -148,12 +174,6 @@
             <span>Fel</span>
             <div><output id="levelError" aria-live="polite">--</output> mm</div>
           </div>
-        </div>
-        <label for="desiredLevel">Önskad nivå</label>
-        <div class="setpoint-control">
-          <input id="desiredLevel" type="number" min="0" max="500" step="1" value="250" disabled>
-          <span>mm</span>
-          <button id="sendSetpointButton" type="button" disabled>Ställ in</button>
         </div>
         <div class="chart-toolbar">
           <div class="chart-legend" aria-label="Förklaring till grafen">
@@ -202,8 +222,13 @@
     const diagramError = document.querySelector("#diagramError");
     const diagramRegulator = document.querySelector("#diagramRegulator");
     const regulatorDialog = document.querySelector("#regulatorDialog");
+    const diagramActuator = document.querySelector("#diagramActuator");
+    const motorDialog = document.querySelector("#motorDialog");
+    const diagramSetpoint = document.querySelector("#diagramSetpoint");
+    const setpointDialog = document.querySelector("#setpointDialog");
     const diagramMode = document.querySelector("#diagramMode");
-    const diagramPwm = document.querySelector("#diagramPwm");
+    const diagramControlSignal = document.querySelector("#diagramControlSignal");
+    const motorPwmPercent = document.querySelector("#motorPwmPercent");
     const diagramOutput = document.querySelector("#diagramOutput");
     const diagramSensor = document.querySelector("#diagramSensor");
     const diagramFeedback = document.querySelector("#diagramFeedback");
@@ -444,7 +469,7 @@
 
             if (controlMode.value === "manual") {
               motorPwm.value = values[1];
-              motorPwmValue.value = values[1];
+              updateMotorDisplay(values[1]);
             }
           }
         }
@@ -512,12 +537,20 @@
       setStatus(`Motor PWM: ${motorPwm.value}.`);
     }
 
+    function updateMotorDisplay(pwm) {
+      const percent = Math.round((Number(pwm) / 255) * 100);
+      motorPwmValue.value = `${pwm} PWM`;
+      motorPwmPercent.value = `${percent}%`;
+      diagramControlSignal.textContent = `${percent}%`;
+    }
+
     async function sendDesiredLevel() {
       if (!desiredLevel.reportValidity()) {
         return;
       }
 
       desiredLevelDisplay.value = Number(desiredLevel.value).toFixed(1);
+      diagramDesired.textContent = `${Number(desiredLevel.value).toFixed(1)} mm`;
       await sendCommand(`SETPOINT:${desiredLevel.value}`);
       setStatus(`Önskad nivå skickad: ${desiredLevel.value} mm.`);
     }
@@ -596,8 +629,7 @@
     });
 
     motorPwm.addEventListener("input", () => {
-      motorPwmValue.value = motorPwm.value;
-      diagramPwm.textContent = `${motorPwm.value} PWM`;
+      updateMotorDisplay(motorPwm.value);
     });
 
     controlMode.addEventListener("change", async () => {
@@ -625,6 +657,38 @@
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openRegulatorControls();
+      }
+    });
+
+    function openMotorControls() {
+      if (!motorDialog.open) {
+        motorDialog.showModal();
+      }
+
+      motorPwm.focus();
+    }
+
+    diagramActuator.addEventListener("click", openMotorControls);
+    diagramActuator.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openMotorControls();
+      }
+    });
+
+    function openSetpointControls() {
+      if (!setpointDialog.open) {
+        setpointDialog.showModal();
+      }
+
+      desiredLevel.focus();
+    }
+
+    diagramSetpoint.addEventListener("click", openSetpointControls);
+    diagramSetpoint.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSetpointControls();
       }
     });
 
