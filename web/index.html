@@ -241,11 +241,25 @@
         </div>
         <div class="chart-layout">
           <div class="chart-card level-chart">
-            <div class="chart-card-heading">Uppmätt / Önskad</div>
+            <div class="chart-card-heading">
+              <span>Uppmätt / Önskad</span>
+              <span class="y-zoom-controls" aria-label="Zooma nivågrafens y-axel">
+                <button id="levelZoomOut" type="button" aria-label="Zooma ut nivågrafen">-</button>
+                <output id="levelZoomValue">+/-250 mm</output>
+                <button id="levelZoomIn" type="button" aria-label="Zooma in nivågrafen">+</button>
+              </span>
+            </div>
             <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
           </div>
           <div class="chart-card error-panel manual-error-display" aria-label="Reglerfel">
-            <div class="chart-card-heading">Fel</div>
+            <div class="chart-card-heading">
+              <span>Fel</span>
+              <span class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
+                <button id="errorZoomOut" type="button" aria-label="Zooma ut felgrafen">-</button>
+                <output id="errorZoomValue">+/-250 mm</output>
+                <button id="errorZoomIn" type="button" aria-label="Zooma in felgrafen">+</button>
+              </span>
+            </div>
             <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
           </div>
         </div>
@@ -320,6 +334,12 @@
     const levelChartContext = levelChart.getContext("2d");
     const errorChart = document.querySelector("#errorChart");
     const errorChartContext = errorChart.getContext("2d");
+    const errorZoomOut = document.querySelector("#errorZoomOut");
+    const errorZoomIn = document.querySelector("#errorZoomIn");
+    const errorZoomValue = document.querySelector("#errorZoomValue");
+    const levelZoomOut = document.querySelector("#levelZoomOut");
+    const levelZoomIn = document.querySelector("#levelZoomIn");
+    const levelZoomValue = document.querySelector("#levelZoomValue");
     const toggleChartButton = document.querySelector("#toggleChartButton");
     const statusText = document.querySelector("#status");
 
@@ -356,6 +376,8 @@
     const chartTimeSpanMs = 60000;
     const chartMaxLevel = 500;
     const chartMaxError = 250;
+    let errorChartLimit = chartMaxError;
+    let levelChartHalfRange = 250;
 
     function drawLevelChart() {
       const pixelRatio = window.devicePixelRatio || 1;
@@ -376,13 +398,17 @@
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
       const now = chartPaused ? pausedChartTime : performance.now();
+      const levelCenter = latestDesired ?? Number(desiredLevel.value);
+      const levelMinimum = Math.max(0, levelCenter - levelChartHalfRange);
+      const levelMaximum = Math.min(chartMaxLevel, levelCenter + levelChartHalfRange);
+      const levelTickStep = levelChartHalfRange <= 100 ? 50 : 100;
 
       levelChartContext.font = "11px Segoe UI, sans-serif";
       levelChartContext.lineWidth = 1;
       levelChartContext.textBaseline = "middle";
 
-      for (let level = 0; level <= chartMaxLevel; level += 100) {
-        const y = plot.bottom - (level / chartMaxLevel) * plotHeight;
+      for (let level = Math.ceil(levelMinimum / levelTickStep) * levelTickStep; level <= levelMaximum; level += levelTickStep) {
+        const y = plot.bottom - ((level - levelMinimum) / (levelMaximum - levelMinimum)) * plotHeight;
         levelChartContext.strokeStyle = "#ded5c3";
         levelChartContext.beginPath();
         levelChartContext.moveTo(plot.left, y);
@@ -436,8 +462,8 @@
           levelChartContext.stroke();
         }
 
-        drawSeries("measured", "#24745f", 0, chartMaxLevel);
-        drawSeries("desired", "#2463a0", 0, chartMaxLevel);
+        drawSeries("measured", "#24745f", levelMinimum, levelMaximum);
+        drawSeries("desired", "#2463a0", levelMinimum, levelMaximum);
         levelChartContext.restore();
       }
 
@@ -464,7 +490,7 @@
       const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
-      const errorLimit = chartMaxError;
+      const errorLimit = errorChartLimit;
 
       errorChartContext.font = "11px Segoe UI, sans-serif";
       errorChartContext.textBaseline = "middle";
@@ -1070,6 +1096,52 @@
         toggleChartButton.textContent = "Pausa graf";
       }
     });
+
+    function updateErrorZoom() {
+      errorZoomValue.textContent = `+/-${errorChartLimit} mm`;
+      errorZoomIn.disabled = errorChartLimit <= 50;
+      errorZoomOut.disabled = errorChartLimit >= 500;
+    }
+
+    errorZoomIn.addEventListener("click", () => {
+      errorChartLimit = Math.max(50, errorChartLimit - 50);
+      updateErrorZoom();
+    });
+
+    errorZoomOut.addEventListener("click", () => {
+      errorChartLimit = Math.min(500, errorChartLimit + 50);
+      updateErrorZoom();
+    });
+
+    errorZoomValue.addEventListener("dblclick", () => {
+      errorChartLimit = 250;
+      updateErrorZoom();
+    });
+
+    updateErrorZoom();
+
+    function updateLevelZoom() {
+      levelZoomValue.textContent = `+/-${levelChartHalfRange} mm`;
+      levelZoomIn.disabled = levelChartHalfRange <= 50;
+      levelZoomOut.disabled = levelChartHalfRange >= 500;
+    }
+
+    levelZoomIn.addEventListener("click", () => {
+      levelChartHalfRange = Math.max(50, levelChartHalfRange - 50);
+      updateLevelZoom();
+    });
+
+    levelZoomOut.addEventListener("click", () => {
+      levelChartHalfRange = Math.min(500, levelChartHalfRange + 50);
+      updateLevelZoom();
+    });
+
+    levelZoomValue.addEventListener("dblclick", () => {
+      levelChartHalfRange = 250;
+      updateLevelZoom();
+    });
+
+    updateLevelZoom();
 
     sendSetpointButton.addEventListener("click", async () => {
       sendSetpointButton.disabled = true;

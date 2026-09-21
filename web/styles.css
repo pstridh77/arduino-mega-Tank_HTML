@@ -575,6 +575,35 @@ input:disabled {
   min-height: 1.35rem;
 }
 
+.y-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.y-zoom-controls output {
+  cursor: pointer;
+  user-select: none;
+}
+
+.y-zoom-controls button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  line-height: 1;
+}
+
+.y-zoom-controls button:hover {
+  background: var(--accent);
+  color: white;
+}
+
 .error-panel .chart-card-heading {
   color: #b4492f;
 }
