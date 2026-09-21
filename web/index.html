@@ -130,6 +130,24 @@
         </form>
       </dialog>
 
+      <dialog id="processDialog" aria-labelledby="processTitle">
+        <form method="dialog" class="regulator-dialog-content process-explanation">
+          <div class="dialog-heading">
+            <h2 id="processTitle">Tanknivå</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng tankvisning">Stäng</button>
+          </div>
+          <div class="tank-view" aria-label="Animerad tank med höjd 500 millimeter">
+            <div class="tank-scale"><span>500 mm</span><span>250 mm</span><span>0 mm</span></div>
+            <div class="tank-pipe">
+              <div id="tankWater" class="tank-water"></div>
+              <div class="tank-level-line"></div>
+            </div>
+          </div>
+          <output id="processLevelValue" class="process-level-value">-- mm</output>
+          <p>Vattnet fylls från botten. Tankens höjd är 500 mm.</p>
+        </form>
+      </dialog>
+
       <figure class="control-diagram" aria-labelledby="diagramTitle">
         <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
         <svg id="controlDiagram" viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
@@ -170,7 +188,7 @@
             <text x="638" y="59" text-anchor="middle">Styrdon</text>
           </g>
           <line class="diagram-line" x1="688" y1="68" x2="720" y2="68" marker-end="url(#arrowHead)"></line>
-          <g class="diagram-box">
+          <g id="diagramProcess" class="diagram-box diagram-process" role="button" tabindex="0" aria-label="Öppna tankvisning" aria-controls="processDialog">
             <rect x="720" y="34" width="150" height="68" rx="6"></rect>
             <text x="795" y="62" text-anchor="middle">Process</text>
           </g>
@@ -277,6 +295,10 @@
     const diagramOutput = document.querySelector("#diagramOutput");
     const diagramSensor = document.querySelector("#diagramSensor");
     const sensorDialog = document.querySelector("#sensorDialog");
+    const diagramProcess = document.querySelector("#diagramProcess");
+    const processDialog = document.querySelector("#processDialog");
+    const tankWater = document.querySelector("#tankWater");
+    const processLevelValue = document.querySelector("#processLevelValue");
     const sensorAdcValue = document.querySelector("#sensorAdcValue");
     const sensorVoltageValue = document.querySelector("#sensorVoltageValue");
     const sensorDistanceValue = document.querySelector("#sensorDistanceValue");
@@ -316,6 +338,7 @@
     let latestOutputPwm = 0;
     let latestPContribution = 0;
     let latestIContribution = 0;
+    let latestProcessLevel = null;
     let latestSensorAdc = null;
     let latestSensorVoltage = null;
     let latestSensorDistance = null;
@@ -561,6 +584,7 @@
 
     function updateLevelValues(measured, desired, error) {
       latestMeasured = measured;
+      latestProcessLevel = measured;
       latestDesired = desired;
       latestError = error;
         measuredLevel.value = measured.toFixed(1);
@@ -570,6 +594,7 @@
       diagramError.textContent = `${error.toFixed(1)} mm`;
       diagramOutput.textContent = `${measured.toFixed(1)} mm`;
       diagramSensor.textContent = `${measured.toFixed(1)} mm`;
+      updateProcessTank(measured);
       diagramFeedback.textContent = `${measured.toFixed(1)} mm`;
       updateSignalExplanation();
 
@@ -614,6 +639,13 @@
       motorPwmPercent.value = `${percent}%`;
       diagramControlSignal.textContent = `${percent}%`;
       updateSignalExplanation();
+    }
+
+    function updateProcessTank(level) {
+      const boundedLevel = Math.max(0, Math.min(500, Number(level)));
+      const percentage = Number.isFinite(boundedLevel) ? (boundedLevel / 500) * 100 : 0;
+      tankWater.style.height = `${percentage}%`;
+      processLevelValue.textContent = Number.isFinite(boundedLevel) ? `${boundedLevel.toFixed(1)} mm` : "-- mm";
     }
 
     function updateSensorExplanation(level) {
@@ -860,6 +892,21 @@
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openSensorControls();
+      }
+    });
+
+    function openProcessControls() {
+      updateProcessTank(latestProcessLevel ?? latestMeasured ?? 0);
+      if (!processDialog.open) {
+        processDialog.showModal();
+      }
+    }
+
+    diagramProcess.addEventListener("click", openProcessControls);
+    diagramProcess.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openProcessControls();
       }
     });
 
