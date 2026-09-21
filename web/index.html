@@ -28,47 +28,53 @@
         </div>
         </section>
 
-        <section class="panel-section" aria-labelledby="controlModeTitle">
-        <h2 id="controlModeTitle">Reglerläge</h2>
-        <label for="controlMode">Välj reglering</label>
-        <select id="controlMode" disabled>
-          <option value="off" selected>Off</option>
-          <option value="manual">Manuell</option>
-          <option value="on-off">On/Off-regulator</option>
-          <option value="p">P-regulator</option>
-          <option value="pi">PI-regulator</option>
-        </select>
-        <div id="onOffSettings" class="mode-settings" hidden>
-          <label for="onOffHysteresis">Hysteres från önskad nivå</label>
-          <div class="setting-control">
-            <input id="onOffHysteresis" type="number" min="0" max="250" step="1" value="10" disabled>
-            <span>mm</span>
-          </div>
-          <label for="onOffPwm">Pumpens effekt</label>
-          <div class="setting-control">
-            <input id="onOffPwm" type="number" min="0" max="255" step="1" value="180" disabled>
-            <span>PWM</span>
-          </div>
-          <button id="sendOnOffSettingsButton" type="button" disabled>Ställ in On/Off</button>
-        </div>
-        <div id="pSettings" class="mode-settings" hidden>
-          <label for="pGain">Förstärkning K</label>
-          <div class="setting-control">
-            <input id="pGain" type="number" min="0" max="10" step="0.2" value="1.0" disabled>
-            <span>K</span>
-          </div>
-          <button id="sendPSettingsButton" type="button" disabled>Ställ in P-regulator</button>
-        </div>
-        <div id="piSettings" class="mode-settings" hidden>
-          <label for="piIntegralGain">Integralförstärkning Ki</label>
-          <div class="setting-control">
-            <input id="piIntegralGain" type="number" min="0" max="2" step="0.05" value="0.1" disabled>
-            <span>Ki</span>
-          </div>
-          <button id="sendPiSettingsButton" type="button" disabled>Ställ in PI-regulator</button>
-        </div>
-        </section>
       </div>
+
+      <dialog id="regulatorDialog" aria-labelledby="controlModeTitle">
+        <form method="dialog" class="regulator-dialog-content">
+          <div class="dialog-heading">
+            <h2 id="controlModeTitle">Regulatorinställningar</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng regulatorinställningar">Stäng</button>
+          </div>
+          <label for="controlMode">Välj reglering</label>
+          <select id="controlMode" disabled>
+            <option value="off" selected>Off</option>
+            <option value="manual">Manuell</option>
+            <option value="on-off">On/Off-regulator</option>
+            <option value="p">P-regulator</option>
+            <option value="pi">PI-regulator</option>
+          </select>
+          <div id="onOffSettings" class="mode-settings" hidden>
+            <label for="onOffHysteresis">Hysteres från önskad nivå</label>
+            <div class="setting-control">
+              <input id="onOffHysteresis" type="number" min="0" max="250" step="1" value="10" disabled>
+              <span>mm</span>
+            </div>
+            <label for="onOffPwm">Pumpens effekt</label>
+            <div class="setting-control">
+              <input id="onOffPwm" type="number" min="0" max="255" step="1" value="180" disabled>
+              <span>PWM</span>
+            </div>
+            <button id="sendOnOffSettingsButton" type="button" disabled>Ställ in On/Off</button>
+          </div>
+          <div id="pSettings" class="mode-settings" hidden>
+            <label for="pGain">Förstärkning K</label>
+            <div class="setting-control">
+              <input id="pGain" type="number" min="0" max="10" step="0.2" value="1.0" disabled>
+              <span>K</span>
+            </div>
+            <button id="sendPSettingsButton" type="button" disabled>Ställ in P-regulator</button>
+          </div>
+          <div id="piSettings" class="mode-settings" hidden>
+            <label for="piIntegralGain">Integralförstärkning Ki</label>
+            <div class="setting-control">
+              <input id="piIntegralGain" type="number" min="0" max="2" step="0.05" value="0.1" disabled>
+              <span>Ki</span>
+            </div>
+            <button id="sendPiSettingsButton" type="button" disabled>Ställ in PI-regulator</button>
+          </div>
+        </form>
+      </dialog>
 
       <figure class="control-diagram" aria-labelledby="diagramTitle">
         <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
@@ -96,7 +102,7 @@
           <text class="diagram-label" x="335" y="53" text-anchor="middle">Reglerfel</text>
           <text id="diagramError" class="diagram-value" x="335" y="91" text-anchor="middle">-- mm</text>
 
-          <g class="diagram-box">
+          <g id="diagramRegulator" class="diagram-box diagram-regulator" role="button" tabindex="0" aria-label="Välj regulator" aria-controls="controlMode">
             <rect x="366" y="34" width="160" height="68" rx="6"></rect>
             <text x="446" y="62" text-anchor="middle">Regulator</text>
             <text id="diagramMode" x="446" y="84" text-anchor="middle">Off</text>
@@ -114,13 +120,13 @@
           <text id="diagramOutput" class="diagram-value" x="920" y="91" text-anchor="middle">-- mm</text>
 
           <line class="diagram-line" x1="850" y1="68" x2="850" y2="190"></line>
-          <line class="diagram-line" x1="850" y1="190" x2="783" y2="190" marker-end="url(#arrowHead)"></line>
+          <line class="diagram-line" x1="850" y1="190" x2="665" y2="190" marker-end="url(#arrowHead)"></line>
           <g class="diagram-box">
-            <rect x="583" y="156" width="200" height="68" rx="6"></rect>
-            <text x="683" y="184" text-anchor="middle">Givare</text>
-            <text id="diagramSensor" x="683" y="206" text-anchor="middle">-- mm</text>
+            <rect x="465" y="156" width="200" height="68" rx="6"></rect>
+            <text x="565" y="184" text-anchor="middle">Givare</text>
+            <text id="diagramSensor" x="565" y="206" text-anchor="middle">-- mm</text>
           </g>
-          <line class="diagram-line" x1="583" y1="190" x2="278" y2="190"></line>
+          <line class="diagram-line" x1="465" y1="190" x2="278" y2="190"></line>
           <line class="diagram-line" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
           <text class="diagram-label" x="384" y="181" text-anchor="middle">Ärvärde</text>
           <text id="diagramFeedback" class="diagram-value" x="384" y="214" text-anchor="middle">-- mm</text>
@@ -194,6 +200,8 @@
     const levelError = document.querySelector("#levelError");
     const diagramDesired = document.querySelector("#diagramDesired");
     const diagramError = document.querySelector("#diagramError");
+    const diagramRegulator = document.querySelector("#diagramRegulator");
+    const regulatorDialog = document.querySelector("#regulatorDialog");
     const diagramMode = document.querySelector("#diagramMode");
     const diagramPwm = document.querySelector("#diagramPwm");
     const diagramOutput = document.querySelector("#diagramOutput");
@@ -601,6 +609,22 @@
         await sendControlMode();
       } catch (error) {
         setStatus(`Kunde inte välja reglerläge: ${error.message}`, true);
+      }
+    });
+
+    function openRegulatorControls() {
+      if (!regulatorDialog.open) {
+        regulatorDialog.showModal();
+      }
+
+      controlMode.focus();
+    }
+
+    diagramRegulator.addEventListener("click", openRegulatorControls);
+    diagramRegulator.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openRegulatorControls();
       }
     });
 
