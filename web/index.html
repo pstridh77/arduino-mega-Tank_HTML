@@ -14,7 +14,8 @@
     <div class="controls">
       <button id="connectButton" type="button">Anslut Arduino</button>
 
-      <section class="panel-section" aria-labelledby="motorTitle">
+      <div class="top-controls">
+        <section class="panel-section" aria-labelledby="motorTitle">
         <div class="section-heading">
           <h2 id="motorTitle">Motorhastighet</h2>
           <output id="motorPwmValue" for="motorPwm">0</output>
@@ -25,9 +26,9 @@
           <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
           <span>PWM: <output id="potentiometerPwm">-- / 255</output></span>
         </div>
-      </section>
+        </section>
 
-      <section class="panel-section" aria-labelledby="controlModeTitle">
+        <section class="panel-section" aria-labelledby="controlModeTitle">
         <h2 id="controlModeTitle">Reglerläge</h2>
         <label for="controlMode">Välj reglering</label>
         <select id="controlMode" disabled>
@@ -66,7 +67,65 @@
           </div>
           <button id="sendPiSettingsButton" type="button" disabled>Ställ in PI-regulator</button>
         </div>
-      </section>
+        </section>
+      </div>
+
+      <figure class="control-diagram" aria-labelledby="diagramTitle">
+        <figcaption id="diagramTitle">Reglersystemets återkoppling</figcaption>
+        <svg viewBox="0 0 1120 310" role="img" aria-labelledby="diagramTitle diagramDescription">
+          <desc id="diagramDescription">Börvärdet jämförs med ärvärdet. Reglerfelet behandlas av regulatorn som skickar en styrsignal till processen. En givare mäter processen och återkopplar ärvärdet.</desc>
+          <defs>
+            <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z"></path>
+            </marker>
+          </defs>
+
+          <g class="diagram-box diagram-setpoint">
+            <rect x="24" y="34" width="150" height="68" rx="6"></rect>
+            <text x="99" y="59" text-anchor="middle">Börvärde</text>
+            <text id="diagramDesired" x="99" y="83" text-anchor="middle">-- mm</text>
+          </g>
+          <line class="diagram-line" x1="174" y1="68" x2="252" y2="68" marker-end="url(#arrowHead)"></line>
+
+          <g class="diagram-sum">
+            <circle cx="278" cy="68" r="26"></circle>
+            <text x="269" y="62" text-anchor="middle">+</text>
+            <text x="269" y="82" text-anchor="middle">-</text>
+          </g>
+          <line class="diagram-line" x1="304" y1="68" x2="366" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="335" y="53" text-anchor="middle">Reglerfel</text>
+          <text id="diagramError" class="diagram-value" x="335" y="91" text-anchor="middle">-- mm</text>
+
+          <g class="diagram-box">
+            <rect x="366" y="34" width="160" height="68" rx="6"></rect>
+            <text x="446" y="62" text-anchor="middle">Regulator</text>
+            <text id="diagramMode" x="446" y="84" text-anchor="middle">Off</text>
+          </g>
+          <line class="diagram-line" x1="526" y1="68" x2="588" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="557" y="53" text-anchor="middle">Styrsignal</text>
+          <text id="diagramPwm" class="diagram-value" x="557" y="91" text-anchor="middle">0 PWM</text>
+
+          <g class="diagram-box">
+            <rect x="588" y="34" width="190" height="68" rx="6"></rect>
+            <text x="683" y="59" text-anchor="middle">Styrdon / Process</text>
+          </g>
+          <line class="diagram-line" x1="778" y1="68" x2="1060" y2="68" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="920" y="53" text-anchor="middle">Reglerad storhet</text>
+          <text id="diagramOutput" class="diagram-value" x="920" y="91" text-anchor="middle">-- mm</text>
+
+          <line class="diagram-line" x1="850" y1="68" x2="850" y2="190"></line>
+          <line class="diagram-line" x1="850" y1="190" x2="783" y2="190" marker-end="url(#arrowHead)"></line>
+          <g class="diagram-box">
+            <rect x="583" y="156" width="200" height="68" rx="6"></rect>
+            <text x="683" y="184" text-anchor="middle">Givare</text>
+            <text id="diagramSensor" x="683" y="206" text-anchor="middle">-- mm</text>
+          </g>
+          <line class="diagram-line" x1="583" y1="190" x2="278" y2="190"></line>
+          <line class="diagram-line" x1="278" y1="190" x2="278" y2="94" marker-end="url(#arrowHead)"></line>
+          <text class="diagram-label" x="384" y="181" text-anchor="middle">Ärvärde</text>
+          <text id="diagramFeedback" class="diagram-value" x="384" y="214" text-anchor="middle">-- mm</text>
+        </svg>
+      </figure>
 
       <section class="panel-section" aria-labelledby="levelTitle">
         <h2 id="levelTitle">Nivåreglering</h2>
@@ -81,7 +140,7 @@
           </div>
           <div class="level-reading error">
             <span>Fel</span>
-            <div><output id="levelError">--</output> mm</div>
+            <div><output id="levelError" aria-live="polite">--</output> mm</div>
           </div>
         </div>
         <label for="desiredLevel">Önskad nivå</label>
@@ -94,12 +153,18 @@
           <div class="chart-legend" aria-label="Förklaring till grafen">
             <span><i class="measured"></i>Uppmätt</span>
             <span><i class="desired"></i>Önskad</span>
-            <span><i class="error"></i>Fel (högerskala)</span>
           </div>
           <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
         </div>
-        <div class="level-chart">
-          <canvas id="levelChart" role="img" aria-label="Uppmätt nivå, önskad nivå och reglerfel under de senaste 60 sekunderna"></canvas>
+        <div class="chart-layout">
+          <div class="chart-card level-chart">
+            <div class="chart-card-heading">Uppmätt / Önskad</div>
+            <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
+          </div>
+          <div class="chart-card error-panel" aria-label="Reglerfel">
+            <div class="chart-card-heading">Fel</div>
+            <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
+          </div>
         </div>
       </section>
 
@@ -127,10 +192,19 @@
     const measuredLevel = document.querySelector("#measuredLevel");
     const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
     const levelError = document.querySelector("#levelError");
+    const diagramDesired = document.querySelector("#diagramDesired");
+    const diagramError = document.querySelector("#diagramError");
+    const diagramMode = document.querySelector("#diagramMode");
+    const diagramPwm = document.querySelector("#diagramPwm");
+    const diagramOutput = document.querySelector("#diagramOutput");
+    const diagramSensor = document.querySelector("#diagramSensor");
+    const diagramFeedback = document.querySelector("#diagramFeedback");
     const desiredLevel = document.querySelector("#desiredLevel");
     const sendSetpointButton = document.querySelector("#sendSetpointButton");
     const levelChart = document.querySelector("#levelChart");
     const levelChartContext = levelChart.getContext("2d");
+    const errorChart = document.querySelector("#errorChart");
+    const errorChartContext = errorChart.getContext("2d");
     const toggleChartButton = document.querySelector("#toggleChartButton");
     const statusText = document.querySelector("#status");
 
@@ -155,6 +229,7 @@
     const levelHistory = [];
     const chartTimeSpanMs = 60000;
     const chartMaxLevel = 500;
+    const chartMaxError = 250;
 
     function drawLevelChart() {
       const pixelRatio = window.devicePixelRatio || 1;
@@ -190,8 +265,6 @@
         levelChartContext.fillStyle = "#6b665b";
         levelChartContext.textAlign = "right";
         levelChartContext.fillText(String(level), plot.left - 7, y);
-        levelChartContext.textAlign = "left";
-        levelChartContext.fillText(String(level * 2 - 500), plot.right + 7, y);
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -239,11 +312,92 @@
 
         drawSeries("measured", "#24745f", 0, chartMaxLevel);
         drawSeries("desired", "#2463a0", 0, chartMaxLevel);
-        drawSeries("error", "#b4492f", -chartMaxLevel, chartMaxLevel);
         levelChartContext.restore();
       }
 
+      drawErrorChart(now);
+
       requestAnimationFrame(drawLevelChart);
+    }
+
+    function drawErrorChart(now) {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const width = errorChart.clientWidth;
+      const height = errorChart.clientHeight;
+      const requiredWidth = Math.round(width * pixelRatio);
+      const requiredHeight = Math.round(height * pixelRatio);
+
+      if (errorChart.width !== requiredWidth || errorChart.height !== requiredHeight) {
+        errorChart.width = requiredWidth;
+        errorChart.height = requiredHeight;
+      }
+
+      errorChartContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      errorChartContext.clearRect(0, 0, width, height);
+
+      const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
+      const plotWidth = plot.right - plot.left;
+      const plotHeight = plot.bottom - plot.top;
+      const errorLimit = chartMaxError;
+
+      errorChartContext.font = "11px Segoe UI, sans-serif";
+      errorChartContext.textBaseline = "middle";
+      errorChartContext.textAlign = "right";
+
+      const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
+      for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
+        const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
+        errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
+        errorChartContext.beginPath();
+        errorChartContext.moveTo(plot.left, y);
+        errorChartContext.lineTo(plot.right, y);
+        errorChartContext.stroke();
+        errorChartContext.fillStyle = "#6b665b";
+        errorChartContext.fillText(String(value), plot.left - 7, y);
+      }
+
+      for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
+        const x = plot.right - (secondsAgo / 60) * plotWidth;
+        errorChartContext.strokeStyle = "#ded5c3";
+        errorChartContext.beginPath();
+        errorChartContext.moveTo(x, plot.top);
+        errorChartContext.lineTo(x, plot.bottom);
+        errorChartContext.stroke();
+      }
+
+      errorChartContext.textBaseline = "alphabetic";
+      errorChartContext.textAlign = "left";
+      errorChartContext.fillText("-60 s", plot.left, height - 5);
+      errorChartContext.textAlign = "right";
+      errorChartContext.fillText("nu", plot.right, height - 5);
+
+      if (levelHistory.length === 0) {
+        return;
+      }
+
+      errorChartContext.save();
+      errorChartContext.beginPath();
+      errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
+      errorChartContext.clip();
+      errorChartContext.strokeStyle = "#b4492f";
+      errorChartContext.lineWidth = 2;
+      errorChartContext.lineJoin = "round";
+      errorChartContext.beginPath();
+
+      levelHistory.forEach((sample, index) => {
+        const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
+        const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
+        const y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+
+        if (index === 0) {
+          errorChartContext.moveTo(x, y);
+        } else {
+          errorChartContext.lineTo(x, y);
+        }
+      });
+
+      errorChartContext.stroke();
+      errorChartContext.restore();
     }
 
     drawLevelChart();
@@ -305,6 +459,11 @@
         measuredLevel.value = measured.toFixed(1);
         desiredLevelDisplay.value = desired.toFixed(1);
         levelError.value = error.toFixed(1);
+      diagramDesired.textContent = `${desired.toFixed(1)} mm`;
+      diagramError.textContent = `${error.toFixed(1)} mm`;
+      diagramOutput.textContent = `${measured.toFixed(1)} mm`;
+      diagramSensor.textContent = `${measured.toFixed(1)} mm`;
+      diagramFeedback.textContent = `${measured.toFixed(1)} mm`;
 
         if (chartPaused) {
           return;
@@ -430,12 +589,14 @@
 
     motorPwm.addEventListener("input", () => {
       motorPwmValue.value = motorPwm.value;
+      diagramPwm.textContent = `${motorPwm.value} PWM`;
     });
 
     controlMode.addEventListener("change", async () => {
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
+      diagramMode.textContent = controlMode.options[controlMode.selectedIndex].text;
       try {
         await sendControlMode();
       } catch (error) {

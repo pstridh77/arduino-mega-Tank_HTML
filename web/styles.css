@@ -59,10 +59,79 @@ h2 {
 
 .controls {
   display: grid;
-  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   margin-top: 28px;
   font-family: "Segoe UI", sans-serif;
+}
+
+.top-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.control-diagram {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.control-diagram figcaption {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.control-diagram svg {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+}
+
+.diagram-box rect {
+  fill: #fffaf0;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.diagram-box text,
+.diagram-sum text {
+  fill: var(--ink);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+
+.diagram-box text + text,
+.diagram-value {
+  fill: var(--accent-dark);
+  font-weight: 700;
+}
+
+.diagram-line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+
+.diagram-line marker-end {
+  fill: var(--muted);
+}
+
+.diagram-sum circle {
+  fill: #fffaf0;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.diagram-label {
+  fill: var(--muted);
+  font-family: "Segoe UI", sans-serif;
+  font-size: 12px;
 }
 
 #connectButton,
@@ -290,10 +359,6 @@ input:disabled {
   color: #2463a0;
 }
 
-.chart-legend .error {
-  color: #b4492f;
-}
-
 .chart-toggle {
   min-height: 34px;
   flex: 0 0 auto;
@@ -305,9 +370,45 @@ input:disabled {
   background: #b4492f;
 }
 
-.level-chart {
+.chart-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 14px;
+}
+
+.chart-card {
   width: 100%;
-  height: 220px;
+  height: 260px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffdf8;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.chart-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 1.35rem;
+}
+
+.error-panel .chart-card-heading {
+  color: #b4492f;
+}
+
+.error-chart {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
 }
 
 .level-chart canvas {
@@ -383,4 +484,19 @@ input:checked + .slider::after {
 
 .status.error {
   color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .top-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .error-panel {
+    height: auto;
+    min-height: 90px;
+  }
 }
