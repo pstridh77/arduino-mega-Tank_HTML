@@ -36,6 +36,9 @@ float pGain = DEFAULT_P_GAIN;
 float piIntegralGain = DEFAULT_PI_INTEGRAL_GAIN;
 float piIntegral = 0.0F;
 bool onOffPumpRunning = false;
+int currentMotorPwm = 0;
+float currentPContribution = 0.0F;
+float currentIContribution = 0.0F;
 
 enum RegulationMode {
   MODE_OFF,
@@ -89,10 +92,13 @@ int writeMotorPwm(int requestedPwm) {
     : requestedPwm;
 
   analogWrite(MOTOR_PWM_PIN, safeMotorPwm);
+  currentMotorPwm = safeMotorPwm;
   return safeMotorPwm;
 }
 
 void updateManualMotorPwm() {
+  currentPContribution = 0.0F;
+  currentIContribution = 0.0F;
   const int potentiometerValue = analogRead(MOTOR_POTENTIOMETER_PIN);
   const int requestedMotorPwm = potentiometerValue * 255L / ADC_MAX_VALUE;
   const int motorPwm = writeMotorPwm(requestedMotorPwm);
@@ -104,6 +110,8 @@ void updateManualMotorPwm() {
 }
 
 void updateOnOffMotorPwm(float measuredLevel) {
+  currentPContribution = 0.0F;
+  currentIContribution = 0.0F;
   const float lowerLimit = desiredLevelMm - onOffHysteresisMm;
   const float upperLimit = desiredLevelMm + onOffHysteresisMm;
 
@@ -119,6 +127,8 @@ void updateOnOffMotorPwm(float measuredLevel) {
 
 void updateProportionalMotorPwm(float measuredLevel) {
   const float levelError = desiredLevelMm - measuredLevel;
+  currentPContribution = pGain * levelError;
+  currentIContribution = 0.0F;
   const int requestedMotorPwm = constrain(
     static_cast<int>(MOTOR_MAGNETIZATION_PWM + levelError * pGain),
     0,
@@ -140,9 +150,11 @@ void updatePiMotorPwm(float measuredLevel, float elapsedSeconds) {
     piIntegral = constrain(piIntegral, -maximumIntegral, maximumIntegral);
   }
 
+  currentPContribution = pGain * levelError;
+  currentIContribution = piIntegralGain * piIntegral;
   const float requestedMotorPwm = MOTOR_MAGNETIZATION_PWM
-    + pGain * levelError
-    + piIntegralGain * piIntegral;
+    + currentPContribution
+    + currentIContribution;
   writeMotorPwm(constrain(static_cast<int>(requestedMotorPwm), 0, 255));
 }
 
@@ -367,5 +379,12 @@ void loop() {
     } else if (regulationMode == MODE_PI) {
       updatePiMotorPwm(measuredLevel, elapsedSeconds);
     }
+
+    Serial.print("OUTPUT:");
+    Serial.print(currentMotorPwm);
+    Serial.print('|');
+    Serial.print(currentPContribution, 1);
+    Serial.print('|');
+    Serial.println(currentIContribution, 1);
   }
 }

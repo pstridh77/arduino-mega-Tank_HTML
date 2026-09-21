@@ -28,6 +28,7 @@
             <option value="p">P-regulator</option>
             <option value="pi">PI-regulator</option>
           </select>
+          <button id="openSignalExplanationButton" type="button" disabled>Visa styrsignalens beräkning</button>
           <div id="onOffSettings" class="mode-settings" hidden>
             <label for="onOffHysteresis">Hysteres från önskad nivå</label>
             <div class="setting-control">
@@ -60,6 +61,26 @@
         </form>
       </dialog>
 
+      <dialog id="signalExplanationDialog" aria-labelledby="signalExplanationTitle">
+        <form method="dialog" class="regulator-dialog-content signal-explanation">
+          <div class="dialog-heading">
+            <h2 id="signalExplanationTitle">Så räknas styrsignalen ut</h2>
+            <button class="dialog-close" type="submit" aria-label="Stäng styrsignalens beräkning">Stäng</button>
+          </div>
+          <p id="signalExplanationText">Välj en regulator för att se beräkningen.</p>
+          <div class="signal-facts">
+            <div><span>Börvärde</span><output id="explanationDesired">-- mm</output></div>
+            <div><span>Mätvärde</span><output id="explanationMeasured">-- mm</output></div>
+            <div><span>Fel</span><output id="explanationError">-- mm</output></div>
+            <div><span>Styrsignal</span><output id="explanationOutput">-- PWM / --%</output></div>
+            <div><span>P-del</span><output id="explanationPContribution">0 PWM</output></div>
+            <div><span>I-del</span><output id="explanationIContribution">0 PWM</output></div>
+          </div>
+          <div id="signalMethod" class="signal-method" aria-live="polite">Beräkning: --</div>
+          <div id="signalFormula" class="signal-formula" aria-live="polite">--</div>
+        </form>
+      </dialog>
+
       <dialog id="motorDialog" aria-labelledby="motorTitle">
         <form method="dialog" class="regulator-dialog-content">
           <div class="dialog-heading">
@@ -70,10 +91,9 @@
             <h2>Motorhastighet</h2>
             <div class="motor-values">
               <output id="motorPwmPercent">0%</output>
-              <output id="motorPwmValue" for="motorPwm">0 PWM</output>
+              <output id="motorPwmValue">0 PWM</output>
             </div>
           </div>
-          <input id="motorPwm" type="range" min="0" max="255" value="0" aria-label="Motor PWM" disabled>
           <div class="potentiometer-reading">
             <span>Potentiometer A2</span>
             <output id="potentiometerValue" aria-live="polite">-- / 1023</output>
@@ -130,7 +150,7 @@
           </g>
           <line class="diagram-line" x1="526" y1="68" x2="588" y2="68" marker-end="url(#arrowHead)"></line>
           <text class="diagram-label" x="557" y="53" text-anchor="middle">Styrsignal</text>
-          <text id="diagramControlSignal" class="diagram-value" x="557" y="91" text-anchor="middle">0%</text>
+          <text id="diagramControlSignal" class="diagram-value diagram-interactive" x="557" y="91" text-anchor="middle" role="button" tabindex="0" aria-label="Visa beräkning av styrsignalen">0%</text>
 
           <g id="diagramActuator" class="diagram-box diagram-actuator" role="button" tabindex="0" aria-label="Öppna motorparametrar" aria-controls="motorDialog">
             <rect x="588" y="34" width="100" height="68" rx="6"></rect>
@@ -200,7 +220,6 @@
 
   <script>
     const connectButton = document.querySelector("#connectButton");
-    const motorPwm = document.querySelector("#motorPwm");
     const motorPwmValue = document.querySelector("#motorPwmValue");
     const potentiometerValue = document.querySelector("#potentiometerValue");
     const potentiometerPwm = document.querySelector("#potentiometerPwm");
@@ -228,6 +247,17 @@
     const setpointDialog = document.querySelector("#setpointDialog");
     const diagramMode = document.querySelector("#diagramMode");
     const diagramControlSignal = document.querySelector("#diagramControlSignal");
+    const openSignalExplanationButton = document.querySelector("#openSignalExplanationButton");
+    const signalExplanationDialog = document.querySelector("#signalExplanationDialog");
+    const signalExplanationText = document.querySelector("#signalExplanationText");
+    const explanationDesired = document.querySelector("#explanationDesired");
+    const explanationMeasured = document.querySelector("#explanationMeasured");
+    const explanationError = document.querySelector("#explanationError");
+    const explanationOutput = document.querySelector("#explanationOutput");
+    const explanationPContribution = document.querySelector("#explanationPContribution");
+    const explanationIContribution = document.querySelector("#explanationIContribution");
+    const signalMethod = document.querySelector("#signalMethod");
+    const signalFormula = document.querySelector("#signalFormula");
     const motorPwmPercent = document.querySelector("#motorPwmPercent");
     const diagramOutput = document.querySelector("#diagramOutput");
     const diagramSensor = document.querySelector("#diagramSensor");
@@ -242,8 +272,8 @@
     const statusText = document.querySelector("#status");
 
     const serialControls = [
-      motorPwm,
       controlMode,
+      openSignalExplanationButton,
       onOffHysteresis,
       onOffPwm,
       sendOnOffSettingsButton,
@@ -259,6 +289,12 @@
     let writer;
     let chartPaused = false;
     let pausedChartTime = 0;
+    let latestMeasured = null;
+    let latestDesired = null;
+    let latestError = null;
+    let latestOutputPwm = 0;
+    let latestPContribution = 0;
+    let latestIContribution = 0;
     const levelHistory = [];
     const chartTimeSpanMs = 60000;
     const chartMaxLevel = 500;
@@ -460,6 +496,19 @@
       }
 
       if (!line.startsWith("LEVEL:")) {
+        if (line.startsWith("OUTPUT:")) {
+          const outputValues = line.substring(7).split("|").map(Number);
+          const outputPwm = outputValues[0];
+
+          if (Number.isInteger(outputPwm) && outputPwm >= 0 && outputPwm <= 255) {
+            latestPContribution = Number.isFinite(outputValues[1]) ? outputValues[1] : 0;
+            latestIContribution = Number.isFinite(outputValues[2]) ? outputValues[2] : 0;
+            latestOutputPwm = outputPwm;
+            updateMotorDisplay(outputPwm);
+            updateSignalExplanation();
+          }
+        }
+
         if (line.startsWith("POT:")) {
           const values = line.substring(4).split("|").map(Number);
 
@@ -468,9 +517,9 @@
             potentiometerPwm.value = `${values[1]} / 255`;
 
             if (controlMode.value === "manual") {
-              motorPwm.value = values[1];
               updateMotorDisplay(values[1]);
             }
+
           }
         }
         return;
@@ -489,6 +538,9 @@
     }
 
     function updateLevelValues(measured, desired, error) {
+      latestMeasured = measured;
+      latestDesired = desired;
+      latestError = error;
         measuredLevel.value = measured.toFixed(1);
         desiredLevelDisplay.value = desired.toFixed(1);
         levelError.value = error.toFixed(1);
@@ -497,6 +549,7 @@
       diagramOutput.textContent = `${measured.toFixed(1)} mm`;
       diagramSensor.textContent = `${measured.toFixed(1)} mm`;
       diagramFeedback.textContent = `${measured.toFixed(1)} mm`;
+      updateSignalExplanation();
 
         if (chartPaused) {
           return;
@@ -532,16 +585,58 @@
       }
     }
 
-    async function sendMotorPwm() {
-      await sendCommand(`MOTOR:${motorPwm.value}`);
-      setStatus(`Motor PWM: ${motorPwm.value}.`);
-    }
-
     function updateMotorDisplay(pwm) {
       const percent = Math.round((Number(pwm) / 255) * 100);
+      latestOutputPwm = Number(pwm);
       motorPwmValue.value = `${pwm} PWM`;
       motorPwmPercent.value = `${percent}%`;
       diagramControlSignal.textContent = `${percent}%`;
+      updateSignalExplanation();
+    }
+
+    function updateSignalExplanation() {
+      const desired = latestDesired ?? Number(desiredLevel.value);
+      const measured = latestMeasured;
+      const error = latestError;
+      const outputPwm = latestOutputPwm;
+      const outputPercent = Math.round((outputPwm / 255) * 100);
+      const mode = controlMode.value;
+      const gain = Number(pGain.value);
+
+      explanationDesired.textContent = Number.isFinite(desired) ? `${desired.toFixed(1)} mm` : "-- mm";
+      explanationMeasured.textContent = Number.isFinite(measured) ? `${measured.toFixed(1)} mm` : "-- mm";
+      explanationError.textContent = Number.isFinite(error) ? `${error.toFixed(1)} mm` : "-- mm";
+      explanationOutput.textContent = `${outputPwm} PWM / ${outputPercent}%`;
+      explanationPContribution.textContent = `${latestPContribution.toFixed(1)} PWM`;
+      explanationIContribution.textContent = `${latestIContribution.toFixed(1)} PWM`;
+
+      if (mode === "manual") {
+        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen direkt från potentiometern.";
+        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255.";
+        signalFormula.textContent = `Potentiometer -> ${outputPwm} PWM -> ${outputPercent}%`;
+      } else if (mode === "off") {
+        signalExplanationText.textContent = "När regulatorn är avstängd skickas ingen effekt till pumpen.";
+        signalMethod.textContent = "Beräkning: regulatorn är avstängd, därför blir signalen 0.";
+        signalFormula.textContent = "Regulator OFF -> 0 PWM -> 0%";
+      } else if (mode === "on-off") {
+        signalExplanationText.textContent = "On/Off-regulatorn väljer mellan avstängd pump och inställd pumpeffekt utifrån hysteresbandet.";
+        signalMethod.textContent = "Beräkning: jämför fel mot hysteresbandet och välj 0 eller inställd pumpeffekt.";
+        signalFormula.textContent = `On/Off -> ${outputPwm} PWM -> ${outputPercent}%`;
+      } else if (mode === "p") {
+        const basePwm = 55;
+        const calculatedPwm = Number.isFinite(error) ? Math.max(0, Math.min(255, Math.trunc(basePwm + error * gain))) : null;
+        signalExplanationText.textContent = "P-regulatorn lägger till ett grundpådrag och ökar signalen proportionellt mot felet.";
+        signalMethod.textContent = "Beräkning: PWM = grundpådrag + (fel x K).";
+        signalFormula.textContent = Number.isFinite(error)
+          ? `55 + (${error.toFixed(1)} x ${gain.toFixed(1)}) = ${calculatedPwm} PWM -> ${outputPercent}%`
+          : "55 + (fel x K) = PWM";
+      } else {
+        signalExplanationText.textContent = "PI-regulatorn använder både det aktuella felet och den ackumulerade integraldelen.";
+        signalMethod.textContent = "Beräkning: PWM = grundpådrag + P-del + integraldel.";
+        signalFormula.textContent = Number.isFinite(error)
+          ? `55 + P(${latestPContribution.toFixed(1)}) + I(${latestIContribution.toFixed(1)}) = ${outputPwm} PWM -> ${outputPercent}%`
+          : "PI: grundpådrag + P-del + integraldel = PWM";
+      }
     }
 
     async function sendDesiredLevel() {
@@ -628,15 +723,12 @@
       }
     });
 
-    motorPwm.addEventListener("input", () => {
-      updateMotorDisplay(motorPwm.value);
-    });
-
     controlMode.addEventListener("change", async () => {
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
       diagramMode.textContent = controlMode.options[controlMode.selectedIndex].text;
+      updateSignalExplanation();
       try {
         await sendControlMode();
       } catch (error) {
@@ -664,8 +756,6 @@
       if (!motorDialog.open) {
         motorDialog.showModal();
       }
-
-      motorPwm.focus();
     }
 
     diagramActuator.addEventListener("click", openMotorControls);
@@ -673,6 +763,22 @@
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openMotorControls();
+      }
+    });
+
+    function openSignalExplanation() {
+      updateSignalExplanation();
+      if (!signalExplanationDialog.open) {
+        signalExplanationDialog.showModal();
+      }
+    }
+
+    openSignalExplanationButton.addEventListener("click", openSignalExplanation);
+    diagramControlSignal.addEventListener("click", openSignalExplanation);
+    diagramControlSignal.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSignalExplanation();
       }
     });
 
@@ -754,14 +860,6 @@
         setStatus(`Kunde inte ställa in önskad nivå: ${error.message}`, true);
       } finally {
         sendSetpointButton.disabled = false;
-      }
-    });
-
-    motorPwm.addEventListener("change", async () => {
-      try {
-        await sendMotorPwm();
-      } catch (error) {
-        setStatus(`Kunde inte styra motorn: ${error.message}`, true);
       }
     });
 
