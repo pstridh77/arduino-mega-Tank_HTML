@@ -1,12 +1,14 @@
 :root {
   color-scheme: light;
-  --bg: #f3f0e8;
-  --panel: #fffaf0;
-  --ink: #20201d;
-  --muted: #6b665b;
-  --accent: #24745f;
-  --accent-dark: #165241;
-  --border: #ded5c3;
+  --bg: #d8ddd3;
+  --panel: #f2f3ec;
+  --surface: #e7eae2;
+  --ink: #1e2821;
+  --muted: #5c675e;
+  --accent: #405b46;
+  --accent-dark: #263a2c;
+  --signal: #c5a34a;
+  --border: #aeb8aa;
   --danger: #a33d2f;
 }
 
@@ -24,27 +26,32 @@ body {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 25% 20%, rgba(36, 116, 95, 0.18), transparent 28rem),
-    linear-gradient(135deg, #f8f4ea 0%, var(--bg) 48%, #e5eadf 100%);
+    linear-gradient(rgba(64, 91, 70, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(64, 91, 70, 0.06) 1px, transparent 1px),
+    linear-gradient(135deg, #eef0e8 0%, var(--bg) 52%, #bdc8bd 100%);
+  background-size: 28px 28px, 28px 28px, auto;
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Arial Narrow", "Segoe UI", sans-serif;
   padding: 24px;
 }
 
 main {
   width: min(100%, 1280px);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--panel) 92%, white);
-  box-shadow: 0 24px 70px rgba(42, 38, 28, 0.18);
+  border-radius: 2px;
+  background: var(--panel);
+  box-shadow: 0 22px 55px rgba(30, 40, 33, 0.24);
+  border-top: 5px solid var(--accent-dark);
   padding: clamp(22px, 5vw, 36px);
 }
 
 h1 {
   margin: 0 0 8px;
-  font-size: clamp(2rem, 8vw, 3.3rem);
-  line-height: 0.95;
-  font-weight: 700;
+  font-size: clamp(2rem, 7vw, 3.1rem);
+  line-height: 1;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   letter-spacing: 0;
 }
 
@@ -78,10 +85,10 @@ h2 {
 dialog {
   width: min(100% - 32px, 480px);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--panel);
   color: var(--ink);
-  box-shadow: 0 24px 70px rgba(42, 38, 28, 0.28);
+  box-shadow: 0 24px 70px rgba(30, 40, 33, 0.38);
   padding: 0;
 }
 
@@ -275,8 +282,8 @@ dialog::backdrop {
 button {
   min-height: 48px;
   border: 0;
-  border-radius: 6px;
-  background: var(--accent);
+  border-radius: 2px;
+  background: var(--accent-dark);
   color: white;
   font: inherit;
   font-weight: 700;
@@ -284,7 +291,7 @@ button {
 }
 
 button:hover {
-  background: var(--accent-dark);
+  background: var(--accent);
 }
 
 button:disabled {
@@ -305,8 +312,8 @@ select {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: white;
+  border-radius: 2px;
+  background: #fbfcf8;
   color: var(--ink);
   font: inherit;
   padding: 8px 10px;
@@ -332,8 +339,9 @@ input:disabled {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fffdf8;
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 
 .section-heading {
@@ -484,11 +492,11 @@ input:disabled {
 }
 
 .chart-legend .measured {
-  color: #24745f;
+  color: #2e725c;
 }
 
 .chart-legend .desired {
-  color: #2463a0;
+  color: #356694;
 }
 
 .chart-toggle {
@@ -499,7 +507,7 @@ input:disabled {
 }
 
 .chart-toggle[aria-pressed="true"] {
-  background: #b4492f;
+  background: #a33d2f;
 }
 
 .chart-layout {
@@ -517,8 +525,9 @@ input:disabled {
   gap: 6px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #fffdf8;
+  border-radius: 2px;
+  background: #f7f8f3;
+  box-shadow: inset 0 3px 0 var(--accent);
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 700;
@@ -533,7 +542,7 @@ input:disabled {
 }
 
 .error-panel .chart-card-heading {
-  color: #b4492f;
+  color: #a33d2f;
 }
 
 .error-chart {
