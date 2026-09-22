@@ -277,14 +277,15 @@
             </div>
             <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
           </div>
-          <div class="chart-card error-panel manual-error-display" aria-label="Reglerfel">
+          <div id="errorPanel" class="chart-card error-panel" aria-label="Reglerfel">
             <div class="chart-card-heading">
-              <span>Fel</span>
-              <span class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
+              <span id="errorChartTitle">Fel</span>
+              <span id="errorZoomControls" class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
                 <button id="errorZoomOut" type="button" aria-label="Zooma ut felgrafen">-</button>
                 <output id="errorZoomValue">+/-250 mm</output>
                 <button id="errorZoomIn" type="button" aria-label="Zooma in felgrafen">+</button>
               </span>
+              <output id="errorChartManualRange" class="y-zoom-controls" hidden>0-100 %</output>
             </div>
             <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
           </div>
@@ -369,6 +370,10 @@
     const levelChartContext = levelChart.getContext("2d");
     const errorChart = document.querySelector("#errorChart");
     const errorChartContext = errorChart.getContext("2d");
+    const errorPanel = document.querySelector("#errorPanel");
+    const errorChartTitle = document.querySelector("#errorChartTitle");
+    const errorZoomControls = document.querySelector("#errorZoomControls");
+    const errorChartManualRange = document.querySelector("#errorChartManualRange");
     const errorZoomOut = document.querySelector("#errorZoomOut");
     const errorZoomIn = document.querySelector("#errorZoomIn");
     const errorZoomValue = document.querySelector("#errorZoomValue");
@@ -528,22 +533,37 @@
       const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
-      const errorLimit = errorChartLimit;
+      const manualChart = controlMode.value === "manual";
 
       errorChartContext.font = "11px Segoe UI, sans-serif";
       errorChartContext.textBaseline = "middle";
       errorChartContext.textAlign = "right";
 
-      const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
-      for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
-        const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
-        errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
-        errorChartContext.beginPath();
-        errorChartContext.moveTo(plot.left, y);
-        errorChartContext.lineTo(plot.right, y);
-        errorChartContext.stroke();
-        errorChartContext.fillStyle = "#6b665b";
-        errorChartContext.fillText(String(value), plot.left - 7, y);
+      if (manualChart) {
+        for (let value = 0; value <= 100; value += 25) {
+          const y = plot.bottom - (value / 100) * plotHeight;
+          errorChartContext.strokeStyle = "#ded5c3";
+          errorChartContext.beginPath();
+          errorChartContext.moveTo(plot.left, y);
+          errorChartContext.lineTo(plot.right, y);
+          errorChartContext.stroke();
+          errorChartContext.fillStyle = "#6b665b";
+          errorChartContext.fillText(String(value), plot.left - 7, y);
+        }
+      } else {
+        const errorLimit = errorChartLimit;
+        const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
+
+        for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
+          const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
+          errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
+          errorChartContext.beginPath();
+          errorChartContext.moveTo(plot.left, y);
+          errorChartContext.lineTo(plot.right, y);
+          errorChartContext.stroke();
+          errorChartContext.fillStyle = "#6b665b";
+          errorChartContext.fillText(String(value), plot.left - 7, y);
+        }
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -569,15 +589,23 @@
       errorChartContext.beginPath();
       errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
       errorChartContext.clip();
-      errorChartContext.strokeStyle = "#b4492f";
+      errorChartContext.strokeStyle = manualChart ? "#24745f" : "#b4492f";
       errorChartContext.lineWidth = 2;
       errorChartContext.lineJoin = "round";
       errorChartContext.beginPath();
 
       levelHistory.forEach((sample, index) => {
         const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
-        const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
-        const y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+        let y;
+
+        if (manualChart) {
+          const boundedMotorPercent = Math.min(100, Math.max(0, sample.motorPercent));
+          y = plot.bottom - (boundedMotorPercent / 100) * plotHeight;
+        } else {
+          const errorLimit = errorChartLimit;
+          const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
+          y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+        }
 
         if (index === 0) {
           errorChartContext.moveTo(x, y);
@@ -688,7 +716,7 @@
         }
 
         const now = performance.now();
-        levelHistory.push({ time: now, measured, desired, error });
+        levelHistory.push({ time: now, measured, desired, error, motorPercent: latestOutputPwm / 255 * 100 });
 
         while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
           levelHistory.shift();
@@ -889,6 +917,15 @@
       pSettings.hidden = controlMode.value !== "p" && controlMode.value !== "pi";
       piSettings.hidden = controlMode.value !== "pi";
       clampDialogPosition(regulatorDialog);
+      updateErrorPanelMode();
+    }
+
+    function updateErrorPanelMode() {
+      const manualChart = controlMode.value === "manual";
+      errorPanel.setAttribute("aria-label", manualChart ? "Motorstyrsignal" : "Reglerfel");
+      errorChartTitle.textContent = manualChart ? "Motor %" : "Fel";
+      errorZoomControls.hidden = manualChart;
+      errorChartManualRange.hidden = !manualChart;
     }
 
     async function sendPiSettings() {
