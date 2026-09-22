@@ -29,6 +29,32 @@
             <option value="pi">PI-regulator</option>
           </select>
           <button id="openSignalExplanationButton" type="button" disabled>Visa styrsignalens beräkning</button>
+          <div id="manualSettings" class="mode-settings" hidden>
+            <div class="section-heading">
+              <span>Styrsignal</span>
+              <div class="motor-values">
+                <output id="manualPotPercent">-- %</output>
+                <output id="manualPotPwm">-- PWM</output>
+              </div>
+            </div>
+            <label id="manualSourceLabel">Styrkälla</label>
+            <div class="manual-source-toggle" role="radiogroup" aria-labelledby="manualSourceLabel">
+              <label>
+                <input type="radio" name="manualSource" id="manualSourcePot" value="pot" disabled checked>
+                Potentiometer
+              </label>
+              <label>
+                <input type="radio" name="manualSource" id="manualSourceManual" value="manual" disabled>
+                Manuellt
+              </label>
+            </div>
+            <label for="manualPwm" id="manualPwmLabel" hidden>Styrsignal (%)</label>
+            <div id="manualPwmControl" class="setting-control" hidden>
+              <input id="manualPwm" type="number" min="0" max="100" step="1" value="0" disabled>
+              <span>%</span>
+            </div>
+            <button id="sendManualPwmButton" type="button" disabled hidden>Sätt styrsignal</button>
+          </div>
           <div id="onOffSettings" class="mode-settings" hidden>
             <label for="onOffHysteresis">Hysteres från önskad nivå</label>
             <div class="setting-control">
@@ -251,14 +277,15 @@
             </div>
             <canvas id="levelChart" role="img" aria-label="Uppmätt och önskad nivå under de senaste 60 sekunderna"></canvas>
           </div>
-          <div class="chart-card error-panel manual-error-display" aria-label="Reglerfel">
+          <div id="errorPanel" class="chart-card error-panel" aria-label="Reglerfel">
             <div class="chart-card-heading">
-              <span>Fel</span>
-              <span class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
+              <span id="errorChartTitle">Fel</span>
+              <span id="errorZoomControls" class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
                 <button id="errorZoomOut" type="button" aria-label="Zooma ut felgrafen">-</button>
                 <output id="errorZoomValue">+/-250 mm</output>
                 <button id="errorZoomIn" type="button" aria-label="Zooma in felgrafen">+</button>
               </span>
+              <output id="errorChartManualRange" class="y-zoom-controls" hidden>0-100 %</output>
             </div>
             <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
           </div>
@@ -300,6 +327,15 @@
     const feedbackElements = controlDiagram.querySelectorAll(".diagram-feedback");
     const diagramControlSignal = document.querySelector("#diagramControlSignal");
     const openSignalExplanationButton = document.querySelector("#openSignalExplanationButton");
+    const manualSettings = document.querySelector("#manualSettings");
+    const manualPwm = document.querySelector("#manualPwm");
+    const sendManualPwmButton = document.querySelector("#sendManualPwmButton");
+    const manualPotPercent = document.querySelector("#manualPotPercent");
+    const manualPotPwm = document.querySelector("#manualPotPwm");
+    const manualSourcePot = document.querySelector("#manualSourcePot");
+    const manualSourceManual = document.querySelector("#manualSourceManual");
+    const manualPwmLabel = document.querySelector("#manualPwmLabel");
+    const manualPwmControl = document.querySelector("#manualPwmControl");
     const signalExplanationDialog = document.querySelector("#signalExplanationDialog");
     const signalExplanationText = document.querySelector("#signalExplanationText");
     const explanationDesired = document.querySelector("#explanationDesired");
@@ -334,6 +370,10 @@
     const levelChartContext = levelChart.getContext("2d");
     const errorChart = document.querySelector("#errorChart");
     const errorChartContext = errorChart.getContext("2d");
+    const errorPanel = document.querySelector("#errorPanel");
+    const errorChartTitle = document.querySelector("#errorChartTitle");
+    const errorZoomControls = document.querySelector("#errorZoomControls");
+    const errorChartManualRange = document.querySelector("#errorChartManualRange");
     const errorZoomOut = document.querySelector("#errorZoomOut");
     const errorZoomIn = document.querySelector("#errorZoomIn");
     const errorZoomValue = document.querySelector("#errorZoomValue");
@@ -347,6 +387,8 @@
       ...emergencyStopButtons,
       controlMode,
       openSignalExplanationButton,
+      manualSourcePot,
+      manualSourceManual,
       onOffHysteresis,
       onOffPwm,
       sendOnOffSettingsButton,
@@ -360,6 +402,7 @@
 
     let port;
     let writer;
+    let isConnected = false;
     let chartPaused = false;
     let pausedChartTime = 0;
     let latestMeasured = null;
@@ -490,22 +533,37 @@
       const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
-      const errorLimit = errorChartLimit;
+      const manualChart = controlMode.value === "manual";
 
       errorChartContext.font = "11px Segoe UI, sans-serif";
       errorChartContext.textBaseline = "middle";
       errorChartContext.textAlign = "right";
 
-      const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
-      for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
-        const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
-        errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
-        errorChartContext.beginPath();
-        errorChartContext.moveTo(plot.left, y);
-        errorChartContext.lineTo(plot.right, y);
-        errorChartContext.stroke();
-        errorChartContext.fillStyle = "#6b665b";
-        errorChartContext.fillText(String(value), plot.left - 7, y);
+      if (manualChart) {
+        for (let value = 0; value <= 100; value += 25) {
+          const y = plot.bottom - (value / 100) * plotHeight;
+          errorChartContext.strokeStyle = "#ded5c3";
+          errorChartContext.beginPath();
+          errorChartContext.moveTo(plot.left, y);
+          errorChartContext.lineTo(plot.right, y);
+          errorChartContext.stroke();
+          errorChartContext.fillStyle = "#6b665b";
+          errorChartContext.fillText(String(value), plot.left - 7, y);
+        }
+      } else {
+        const errorLimit = errorChartLimit;
+        const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
+
+        for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
+          const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
+          errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
+          errorChartContext.beginPath();
+          errorChartContext.moveTo(plot.left, y);
+          errorChartContext.lineTo(plot.right, y);
+          errorChartContext.stroke();
+          errorChartContext.fillStyle = "#6b665b";
+          errorChartContext.fillText(String(value), plot.left - 7, y);
+        }
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -531,15 +589,23 @@
       errorChartContext.beginPath();
       errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
       errorChartContext.clip();
-      errorChartContext.strokeStyle = "#b4492f";
+      errorChartContext.strokeStyle = manualChart ? "#24745f" : "#b4492f";
       errorChartContext.lineWidth = 2;
       errorChartContext.lineJoin = "round";
       errorChartContext.beginPath();
 
       levelHistory.forEach((sample, index) => {
         const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
-        const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
-        const y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+        let y;
+
+        if (manualChart) {
+          const boundedMotorPercent = Math.min(100, Math.max(0, sample.motorPercent));
+          y = plot.bottom - (boundedMotorPercent / 100) * plotHeight;
+        } else {
+          const errorLimit = errorChartLimit;
+          const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
+          y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
+        }
 
         if (index === 0) {
           errorChartContext.moveTo(x, y);
@@ -587,6 +653,17 @@
             latestSensorVoltage = sensorValues[1];
             latestSensorDistance = sensorValues[2];
             updateSensorExplanation(sensorValues[3]);
+          }
+        }
+
+        if (line.startsWith("POT:")) {
+          const potParts = line.substring(4).split("|");
+          const potValue = Number(potParts[0]);
+          const motorPwm = Number(potParts[1]);
+          const source = potParts[2];
+
+          if (Number.isFinite(potValue) && Number.isFinite(motorPwm)) {
+            updatePotDisplay(potValue, motorPwm, source);
           }
         }
 
@@ -639,7 +716,7 @@
         }
 
         const now = performance.now();
-        levelHistory.push({ time: now, measured, desired, error });
+        levelHistory.push({ time: now, measured, desired, error, motorPercent: latestOutputPwm / 255 * 100 });
 
         while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
           levelHistory.shift();
@@ -675,6 +752,22 @@
       motorPwmPercent.value = `${percent}%`;
       diagramControlSignal.textContent = `${percent}%`;
       updateSignalExplanation();
+    }
+
+    function updatePotDisplay(potentiometerValue, motorPwm, source) {
+      const outputPercent = (Number(motorPwm) / 255 * 100).toFixed(1);
+      manualPotPercent.value = `${outputPercent}%`;
+      manualPotPwm.value = `${motorPwm} PWM`;
+    }
+
+    function updateManualSourceControls() {
+      const manualActive = manualSourceManual.checked;
+      manualPwmLabel.hidden = !manualActive;
+      manualPwmControl.hidden = !manualActive;
+      sendManualPwmButton.hidden = !manualActive;
+      manualPwm.disabled = !isConnected || !manualActive;
+      sendManualPwmButton.disabled = !isConnected || !manualActive;
+      clampDialogPosition(regulatorDialog);
     }
 
     function updateProcessTank(level, desired = latestDesired ?? Number(desiredLevel.value)) {
@@ -717,9 +810,9 @@
       explanationIFact.hidden = mode !== "pi";
 
       if (mode === "manual") {
-        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen direkt från potentiometern.";
-        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255.";
-        signalFormula.textContent = `Potentiometer -> ${outputPwm} PWM -> ${outputPercent}%`;
+        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen från potentiometern eller från den skrivbara rutan. Vrids potentiometern tar den över igen.";
+        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255, om inget manuellt värde är satt.";
+        signalFormula.textContent = `Potentiometer / manuellt värde -> ${outputPwm} PWM -> ${outputPercent}%`;
       } else if (mode === "off") {
         signalExplanationText.textContent = "När regulatorn är avstängd skickas ingen effekt till pumpen.";
         signalMethod.textContent = "Beräkning: regulatorn är avstängd, därför blir signalen 0.";
@@ -763,6 +856,22 @@
       setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
     }
 
+    function updateManualSettingsVisibility() {
+      manualSettings.hidden = controlMode.value !== "manual";
+    }
+
+    async function sendManualPwm() {
+      if (!manualPwm.reportValidity()) {
+        return;
+      }
+
+      const pwmValue = Math.round(Number(manualPwm.value) / 100 * 255);
+      await sendCommand(`MANUALPWM:${pwmValue}`);
+      manualSourceManual.checked = true;
+      updateManualSourceControls();
+      setStatus(`Styrsignal satt till ${manualPwm.value}% (${pwmValue} PWM).`);
+    }
+
     function updateOnOffSettingsVisibility() {
       onOffSettings.hidden = controlMode.value !== "on-off";
     }
@@ -803,9 +912,20 @@
     }
 
     function updateRegulatorSettingsVisibility() {
+      manualSettings.hidden = controlMode.value !== "manual";
       onOffSettings.hidden = controlMode.value !== "on-off";
       pSettings.hidden = controlMode.value !== "p" && controlMode.value !== "pi";
       piSettings.hidden = controlMode.value !== "pi";
+      clampDialogPosition(regulatorDialog);
+      updateErrorPanelMode();
+    }
+
+    function updateErrorPanelMode() {
+      const manualChart = controlMode.value === "manual";
+      errorPanel.setAttribute("aria-label", manualChart ? "Motorstyrsignal" : "Reglerfel");
+      errorChartTitle.textContent = manualChart ? "Motor %" : "Fel";
+      errorZoomControls.hidden = manualChart;
+      errorChartManualRange.hidden = !manualChart;
     }
 
     async function sendPiSettings() {
@@ -839,6 +959,8 @@
         serialControls.forEach((control) => {
           control.disabled = false;
         });
+        isConnected = true;
+        updateManualSourceControls();
         connectButton.disabled = true;
         setStatus("Ansluten. Vänta någon sekund efter anslutning om kortet startar om.");
       } catch (error) {
@@ -852,6 +974,8 @@
           button.disabled = true;
         });
       controlMode.value = "off";
+      manualSourcePot.checked = true;
+      updateManualSourceControls();
       updateRegulatorSettingsVisibility();
       updateDiagramFeedbackVisibility();
       diagramMode.textContent = "Off";
@@ -870,6 +994,9 @@
     });
 
     controlMode.addEventListener("change", async () => {
+      manualSourcePot.checked = true;
+      updateManualSourceControls();
+      updateManualSettingsVisibility();
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
@@ -902,6 +1029,21 @@
         dialog.style.top = `${top}px`;
         dialog.dataset.positioned = "true";
       }
+    }
+
+    function clampDialogPosition(dialog) {
+      if (!dialog.open) {
+        return;
+      }
+
+      const bounds = dialog.getBoundingClientRect();
+      const maxLeft = Math.max(8, window.innerWidth - bounds.width - 8);
+      const maxTop = Math.max(8, window.innerHeight - bounds.height - 8);
+      const left = Math.min(Math.max(8, bounds.left), maxLeft);
+      const top = Math.min(Math.max(8, bounds.top), maxTop);
+      dialog.style.left = `${left}px`;
+      dialog.style.top = `${top}px`;
+      dialog.dataset.positioned = "true";
     }
 
     function makeDialogDraggable(dialog) {
@@ -1078,6 +1220,36 @@
       }
     });
 
+    sendManualPwmButton.addEventListener("click", async () => {
+      sendManualPwmButton.disabled = true;
+
+      try {
+        await sendManualPwm();
+      } catch (error) {
+        setStatus(`Kunde inte sätta styrsignalen: ${error.message}`, true);
+      } finally {
+        sendManualPwmButton.disabled = false;
+      }
+    });
+
+    manualSourcePot.addEventListener("change", async () => {
+      updateManualSourceControls();
+
+      try {
+        await sendCommand("MANUALSOURCE:pot");
+        setStatus("Styrkälla: potentiometer.");
+      } catch (error) {
+        setStatus(`Kunde inte växla till potentiometern: ${error.message}`, true);
+      }
+    });
+
+    manualSourceManual.addEventListener("change", () => {
+      updateManualSourceControls();
+      setStatus("Styrkälla: manuellt värde. Ange procent och klicka på Sätt styrsignal.");
+    });
+
+    updateManualSourceControls();
+    updateManualSettingsVisibility();
     updateOnOffSettingsVisibility();
     updatePSettingsVisibility();
     updatePiSettingsVisibility();

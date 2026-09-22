@@ -432,6 +432,20 @@ input:disabled {
   min-height: 42px;
 }
 
+.manual-source-toggle {
+  display: flex;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.manual-source-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .level-values {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
