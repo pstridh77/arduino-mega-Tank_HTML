@@ -253,9 +253,9 @@
               <fieldset class="chart-signal-select" aria-label="Välj signaler för graf 1">
                 <legend>Visa</legend>
                 <span class="chart-signal-options">
-                  <label><input type="checkbox" data-level-signal="measured" checked>Uppmätt</label>
-                  <label><input type="checkbox" data-level-signal="desired" checked>Önskad</label>
-                  <label><input type="checkbox" data-level-signal="motor">Motor %</label>
+                  <label><i class="signal-swatch signal-measured" aria-hidden="true"></i><input type="checkbox" data-level-signal="measured" checked>Uppmätt</label>
+                  <label><i class="signal-swatch signal-desired" aria-hidden="true"></i><input type="checkbox" data-level-signal="desired" checked>Önskad</label>
+                  <label><i class="signal-swatch signal-motor" aria-hidden="true"></i><input type="checkbox" data-level-signal="motor">Motor %</label>
                 </span>
               </fieldset>
               <span id="levelZoomControls" class="y-zoom-controls" aria-label="Zooma nivågrafens y-axel">
@@ -268,14 +268,15 @@
           </div>
           <div id="errorPanel" class="chart-card error-panel" aria-label="Reglerfel">
             <div class="chart-card-heading">
-              <label class="chart-signal-select" for="errorSignalSelect">
-                Visa
-                <select id="errorSignalSelect" aria-label="Välj signal för graf 2">
-                  <option value="error" selected>Fel</option>
-                  <option value="motor">Motor %</option>
-                  <option value="control">Styrsignal (PWM)</option>
-                </select>
-              </label>
+              <fieldset class="chart-signal-select" aria-label="Välj signaler för graf 2">
+                <legend>Visa</legend>
+                <span class="chart-signal-options">
+                  <label><i class="signal-swatch signal-error" aria-hidden="true"></i><input type="checkbox" data-error-signal="error" checked>Fel</label>
+                  <label><i class="signal-swatch signal-pwm" aria-hidden="true"></i><input type="checkbox" data-error-signal="pwm">PWM</label>
+                  <label><i class="signal-swatch signal-p" aria-hidden="true"></i><input type="checkbox" data-error-signal="p">P-del</label>
+                  <label><i class="signal-swatch signal-i" aria-hidden="true"></i><input type="checkbox" data-error-signal="i">I-del</label>
+                </span>
+              </fieldset>
               <span id="errorZoomControls" class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
                 <button id="errorZoomOut" type="button" aria-label="Zooma ut felgrafen">-</button>
                 <output id="errorZoomValue">+/-250 mm</output>
@@ -364,7 +365,7 @@
     const errorChartContext = errorChart.getContext("2d");
     const errorPanel = document.querySelector("#errorPanel");
     const levelSignalInputs = document.querySelectorAll("[data-level-signal]");
-    const errorSignalSelect = document.querySelector("#errorSignalSelect");
+    const errorSignalInputs = document.querySelectorAll("[data-error-signal]");
     const errorZoomControls = document.querySelector("#errorZoomControls");
     const errorZoomOut = document.querySelector("#errorZoomOut");
     const errorZoomIn = document.querySelector("#errorZoomIn");
@@ -551,26 +552,43 @@
       const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
-      const errorSignal = errorSignalSelect.value;
-      const errorChartMode = errorSignal === "error";
-      const chartMinimum = errorChartMode ? -errorChartLimit : 0;
-      const chartMaximum = errorChartMode ? errorChartLimit : errorSignal === "control" ? 255 : 100;
-      const chartTickStep = errorChartMode ? 100 : errorSignal === "control" ? 50 : 25;
+      const selectedErrorSignals = new Set(
+        [...errorSignalInputs]
+          .filter((input) => input.checked)
+          .map((input) => input.dataset.errorSignal),
+      );
+      const hasErrorSignal = selectedErrorSignals.has("error");
+      const hasOutputSignals = ["pwm", "p", "i"].some((signal) => selectedErrorSignals.has(signal));
+      const outputMinimum = selectedErrorSignals.has("p") || selectedErrorSignals.has("i") ? -255 : 0;
+      const outputMaximum = 255;
 
       errorChartContext.font = "11px Segoe UI, sans-serif";
       errorChartContext.textBaseline = "middle";
       errorChartContext.textAlign = "right";
 
-      const firstGridValue = Math.ceil(chartMinimum / chartTickStep) * chartTickStep;
-      for (let value = firstGridValue; value <= chartMaximum; value += chartTickStep) {
-        const y = plot.bottom - ((value - chartMinimum) / (chartMaximum - chartMinimum)) * plotHeight;
-        errorChartContext.strokeStyle = errorChartMode && value === 0 ? "#b9a999" : "#ded5c3";
-        errorChartContext.beginPath();
-        errorChartContext.moveTo(plot.left, y);
-        errorChartContext.lineTo(plot.right, y);
-        errorChartContext.stroke();
+      if (hasErrorSignal) {
+        const firstErrorGridValue = Math.ceil(-errorChartLimit / 100) * 100;
+        for (let value = firstErrorGridValue; value <= errorChartLimit; value += 100) {
+          const y = plot.bottom - ((value + errorChartLimit) / (errorChartLimit * 2)) * plotHeight;
+          errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
+          errorChartContext.beginPath();
+          errorChartContext.moveTo(plot.left, y);
+          errorChartContext.lineTo(plot.right, y);
+          errorChartContext.stroke();
+          errorChartContext.fillStyle = "#6b665b";
+          errorChartContext.textAlign = "right";
+          errorChartContext.fillText(String(value), plot.left - 7, y);
+        }
+      }
+
+      if (hasOutputSignals) {
+        errorChartContext.textAlign = "left";
         errorChartContext.fillStyle = "#6b665b";
-        errorChartContext.fillText(String(value), plot.left - 7, y);
+        const outputTickStep = outputMinimum < 0 ? 100 : 50;
+        for (let value = outputMinimum; value <= outputMaximum; value += outputTickStep) {
+          const y = plot.bottom - ((value - outputMinimum) / (outputMaximum - outputMinimum)) * plotHeight;
+          errorChartContext.fillText(String(value), plot.right + 7, y);
+        }
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -596,31 +614,42 @@
       errorChartContext.beginPath();
       errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
       errorChartContext.clip();
-      errorChartContext.strokeStyle = errorSignal === "error" ? "#b4492f" : errorSignal === "motor" ? "#24745f" : "#2463a0";
       errorChartContext.lineWidth = 2;
       errorChartContext.lineJoin = "round";
-      errorChartContext.beginPath();
 
-      levelHistory.forEach((sample, index) => {
-        const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
-        let y;
+      function drawErrorSeries(property, color, minimum, maximum, transform = (value) => value) {
+        errorChartContext.strokeStyle = color;
+        errorChartContext.beginPath();
 
-        const sampleValue = errorSignal === "error"
-          ? sample.error
-          : errorSignal === "motor"
-            ? sample.motorPercent
-            : sample.controlSignal;
-        const boundedValue = Math.min(chartMaximum, Math.max(chartMinimum, sampleValue));
-        y = plot.bottom - ((boundedValue - chartMinimum) / (chartMaximum - chartMinimum)) * plotHeight;
+        levelHistory.forEach((sample, index) => {
+          const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
+          const sampleValue = transform(sample[property]);
+          const boundedValue = Math.min(maximum, Math.max(minimum, sampleValue));
+          const y = plot.bottom - ((boundedValue - minimum) / (maximum - minimum)) * plotHeight;
 
-        if (index === 0) {
-          errorChartContext.moveTo(x, y);
-        } else {
-          errorChartContext.lineTo(x, y);
-        }
-      });
+          if (index === 0) {
+            errorChartContext.moveTo(x, y);
+          } else {
+            errorChartContext.lineTo(x, y);
+          }
+        });
 
-      errorChartContext.stroke();
+        errorChartContext.stroke();
+      }
+
+      if (selectedErrorSignals.has("error")) {
+        drawErrorSeries("error", "#b4492f", -errorChartLimit, errorChartLimit);
+      }
+      if (selectedErrorSignals.has("pwm")) {
+        drawErrorSeries("controlSignal", "#2463a0", outputMinimum, outputMaximum);
+      }
+      if (selectedErrorSignals.has("p")) {
+        drawErrorSeries("pContribution", "#8c4a9c", outputMinimum, outputMaximum);
+      }
+      if (selectedErrorSignals.has("i")) {
+        drawErrorSeries("iContribution", "#d07a27", outputMinimum, outputMaximum);
+      }
+
       errorChartContext.restore();
     }
 
@@ -726,6 +755,8 @@
           error,
           motorPercent: latestOutputPwm / 255 * 100,
           controlSignal: latestOutputPwm,
+          pContribution: latestPContribution,
+          iContribution: latestIContribution,
         });
 
         while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
@@ -930,15 +961,21 @@
     }
 
     function updateErrorPanelMode() {
-      const errorSignal = errorSignalSelect.value;
+      const selectedErrorSignals = [...errorSignalInputs]
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.errorSignal);
       const signalLabels = {
-        error: "Reglerfel",
-        motor: "Motorprocent",
-        control: "Styrsignal i PWM",
+        error: "fel",
+        pwm: "PWM",
+        p: "P-del",
+        i: "I-del",
       };
-      errorPanel.setAttribute("aria-label", signalLabels[errorSignal]);
-      errorChart.setAttribute("aria-label", `${signalLabels[errorSignal]} under de senaste 60 sekunderna`);
-      errorZoomControls.hidden = errorSignal !== "error";
+      const selectedLabel = selectedErrorSignals.length === 0
+        ? "Ingen signal vald"
+        : selectedErrorSignals.map((signal) => signalLabels[signal]).join(", ");
+      errorPanel.setAttribute("aria-label", selectedLabel);
+      errorChart.setAttribute("aria-label", `${selectedLabel} under de senaste 60 sekunderna`);
+      errorZoomControls.hidden = !selectedErrorSignals.includes("error");
     }
 
     async function sendPiSettings() {
@@ -1288,7 +1325,9 @@
     levelSignalInputs.forEach((input) => {
       input.addEventListener("change", updateChartSignalLabels);
     });
-    errorSignalSelect.addEventListener("change", updateChartSignalLabels);
+    errorSignalInputs.forEach((input) => {
+      input.addEventListener("change", updateChartSignalLabels);
+    });
     updateChartSignalLabels();
 
     toggleChartButton.addEventListener("click", () => {

@@ -585,6 +585,35 @@ fieldset.chart-signal-select {
   font-weight: 700;
 }
 
+.signal-swatch {
+  width: 14px;
+  height: 3px;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+.signal-measured {
+  color: #24745f;
+}
+
+.signal-desired,
+.signal-pwm {
+  color: #2463a0;
+}
+
+.signal-motor,
+.signal-error {
+  color: #b4492f;
+}
+
+.signal-p {
+  color: #8c4a9c;
+}
+
+.signal-i {
+  color: #d07a27;
+}
+
 .chart-signal-select input[type="checkbox"] {
   width: auto;
   min-height: auto;
