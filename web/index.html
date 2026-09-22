@@ -29,6 +29,32 @@
             <option value="pi">PI-regulator</option>
           </select>
           <button id="openSignalExplanationButton" type="button" disabled>Visa styrsignalens beräkning</button>
+          <div id="manualSettings" class="mode-settings" hidden>
+            <div class="section-heading">
+              <span>Styrsignal</span>
+              <div class="motor-values">
+                <output id="manualPotPercent">-- %</output>
+                <output id="manualPotPwm">-- PWM</output>
+              </div>
+            </div>
+            <label id="manualSourceLabel">Styrkälla</label>
+            <div class="manual-source-toggle" role="radiogroup" aria-labelledby="manualSourceLabel">
+              <label>
+                <input type="radio" name="manualSource" id="manualSourcePot" value="pot" disabled checked>
+                Potentiometer
+              </label>
+              <label>
+                <input type="radio" name="manualSource" id="manualSourceManual" value="manual" disabled>
+                Manuellt
+              </label>
+            </div>
+            <label for="manualPwm" id="manualPwmLabel" hidden>Styrsignal (%)</label>
+            <div id="manualPwmControl" class="setting-control" hidden>
+              <input id="manualPwm" type="number" min="0" max="100" step="1" value="0" disabled>
+              <span>%</span>
+            </div>
+            <button id="sendManualPwmButton" type="button" disabled hidden>Sätt styrsignal</button>
+          </div>
           <div id="onOffSettings" class="mode-settings" hidden>
             <label for="onOffHysteresis">Hysteres från önskad nivå</label>
             <div class="setting-control">
@@ -300,6 +326,15 @@
     const feedbackElements = controlDiagram.querySelectorAll(".diagram-feedback");
     const diagramControlSignal = document.querySelector("#diagramControlSignal");
     const openSignalExplanationButton = document.querySelector("#openSignalExplanationButton");
+    const manualSettings = document.querySelector("#manualSettings");
+    const manualPwm = document.querySelector("#manualPwm");
+    const sendManualPwmButton = document.querySelector("#sendManualPwmButton");
+    const manualPotPercent = document.querySelector("#manualPotPercent");
+    const manualPotPwm = document.querySelector("#manualPotPwm");
+    const manualSourcePot = document.querySelector("#manualSourcePot");
+    const manualSourceManual = document.querySelector("#manualSourceManual");
+    const manualPwmLabel = document.querySelector("#manualPwmLabel");
+    const manualPwmControl = document.querySelector("#manualPwmControl");
     const signalExplanationDialog = document.querySelector("#signalExplanationDialog");
     const signalExplanationText = document.querySelector("#signalExplanationText");
     const explanationDesired = document.querySelector("#explanationDesired");
@@ -347,6 +382,8 @@
       ...emergencyStopButtons,
       controlMode,
       openSignalExplanationButton,
+      manualSourcePot,
+      manualSourceManual,
       onOffHysteresis,
       onOffPwm,
       sendOnOffSettingsButton,
@@ -360,6 +397,7 @@
 
     let port;
     let writer;
+    let isConnected = false;
     let chartPaused = false;
     let pausedChartTime = 0;
     let latestMeasured = null;
@@ -590,6 +628,17 @@
           }
         }
 
+        if (line.startsWith("POT:")) {
+          const potParts = line.substring(4).split("|");
+          const potValue = Number(potParts[0]);
+          const motorPwm = Number(potParts[1]);
+          const source = potParts[2];
+
+          if (Number.isFinite(potValue) && Number.isFinite(motorPwm)) {
+            updatePotDisplay(potValue, motorPwm, source);
+          }
+        }
+
         if (line.startsWith("OUTPUT:")) {
           const outputValues = line.substring(7).split("|").map(Number);
           const outputPwm = outputValues[0];
@@ -677,6 +726,22 @@
       updateSignalExplanation();
     }
 
+    function updatePotDisplay(potentiometerValue, motorPwm, source) {
+      const outputPercent = (Number(motorPwm) / 255 * 100).toFixed(1);
+      manualPotPercent.value = `${outputPercent}%`;
+      manualPotPwm.value = `${motorPwm} PWM`;
+    }
+
+    function updateManualSourceControls() {
+      const manualActive = manualSourceManual.checked;
+      manualPwmLabel.hidden = !manualActive;
+      manualPwmControl.hidden = !manualActive;
+      sendManualPwmButton.hidden = !manualActive;
+      manualPwm.disabled = !isConnected || !manualActive;
+      sendManualPwmButton.disabled = !isConnected || !manualActive;
+      clampDialogPosition(regulatorDialog);
+    }
+
     function updateProcessTank(level, desired = latestDesired ?? Number(desiredLevel.value)) {
       const boundedLevel = Math.max(0, Math.min(500, Number(level)));
       const percentage = Number.isFinite(boundedLevel) ? (boundedLevel / 500) * 100 : 0;
@@ -717,9 +782,9 @@
       explanationIFact.hidden = mode !== "pi";
 
       if (mode === "manual") {
-        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen direkt från potentiometern.";
-        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255.";
-        signalFormula.textContent = `Potentiometer -> ${outputPwm} PWM -> ${outputPercent}%`;
+        signalExplanationText.textContent = "I manuellt läge kommer styrsignalen från potentiometern eller från den skrivbara rutan. Vrids potentiometern tar den över igen.";
+        signalMethod.textContent = "Beräkning: potentiometerns läge omvandlas till PWM 0-255, om inget manuellt värde är satt.";
+        signalFormula.textContent = `Potentiometer / manuellt värde -> ${outputPwm} PWM -> ${outputPercent}%`;
       } else if (mode === "off") {
         signalExplanationText.textContent = "När regulatorn är avstängd skickas ingen effekt till pumpen.";
         signalMethod.textContent = "Beräkning: regulatorn är avstängd, därför blir signalen 0.";
@@ -763,6 +828,22 @@
       setStatus(`Reglerläge valt: ${controlMode.options[controlMode.selectedIndex].text}.`);
     }
 
+    function updateManualSettingsVisibility() {
+      manualSettings.hidden = controlMode.value !== "manual";
+    }
+
+    async function sendManualPwm() {
+      if (!manualPwm.reportValidity()) {
+        return;
+      }
+
+      const pwmValue = Math.round(Number(manualPwm.value) / 100 * 255);
+      await sendCommand(`MANUALPWM:${pwmValue}`);
+      manualSourceManual.checked = true;
+      updateManualSourceControls();
+      setStatus(`Styrsignal satt till ${manualPwm.value}% (${pwmValue} PWM).`);
+    }
+
     function updateOnOffSettingsVisibility() {
       onOffSettings.hidden = controlMode.value !== "on-off";
     }
@@ -803,9 +884,11 @@
     }
 
     function updateRegulatorSettingsVisibility() {
+      manualSettings.hidden = controlMode.value !== "manual";
       onOffSettings.hidden = controlMode.value !== "on-off";
       pSettings.hidden = controlMode.value !== "p" && controlMode.value !== "pi";
       piSettings.hidden = controlMode.value !== "pi";
+      clampDialogPosition(regulatorDialog);
     }
 
     async function sendPiSettings() {
@@ -839,6 +922,8 @@
         serialControls.forEach((control) => {
           control.disabled = false;
         });
+        isConnected = true;
+        updateManualSourceControls();
         connectButton.disabled = true;
         setStatus("Ansluten. Vänta någon sekund efter anslutning om kortet startar om.");
       } catch (error) {
@@ -852,6 +937,8 @@
           button.disabled = true;
         });
       controlMode.value = "off";
+      manualSourcePot.checked = true;
+      updateManualSourceControls();
       updateRegulatorSettingsVisibility();
       updateDiagramFeedbackVisibility();
       diagramMode.textContent = "Off";
@@ -870,6 +957,9 @@
     });
 
     controlMode.addEventListener("change", async () => {
+      manualSourcePot.checked = true;
+      updateManualSourceControls();
+      updateManualSettingsVisibility();
       updateOnOffSettingsVisibility();
       updatePSettingsVisibility();
       updatePiSettingsVisibility();
@@ -902,6 +992,21 @@
         dialog.style.top = `${top}px`;
         dialog.dataset.positioned = "true";
       }
+    }
+
+    function clampDialogPosition(dialog) {
+      if (!dialog.open) {
+        return;
+      }
+
+      const bounds = dialog.getBoundingClientRect();
+      const maxLeft = Math.max(8, window.innerWidth - bounds.width - 8);
+      const maxTop = Math.max(8, window.innerHeight - bounds.height - 8);
+      const left = Math.min(Math.max(8, bounds.left), maxLeft);
+      const top = Math.min(Math.max(8, bounds.top), maxTop);
+      dialog.style.left = `${left}px`;
+      dialog.style.top = `${top}px`;
+      dialog.dataset.positioned = "true";
     }
 
     function makeDialogDraggable(dialog) {
@@ -1078,6 +1183,36 @@
       }
     });
 
+    sendManualPwmButton.addEventListener("click", async () => {
+      sendManualPwmButton.disabled = true;
+
+      try {
+        await sendManualPwm();
+      } catch (error) {
+        setStatus(`Kunde inte sätta styrsignalen: ${error.message}`, true);
+      } finally {
+        sendManualPwmButton.disabled = false;
+      }
+    });
+
+    manualSourcePot.addEventListener("change", async () => {
+      updateManualSourceControls();
+
+      try {
+        await sendCommand("MANUALSOURCE:pot");
+        setStatus("Styrkälla: potentiometer.");
+      } catch (error) {
+        setStatus(`Kunde inte växla till potentiometern: ${error.message}`, true);
+      }
+    });
+
+    manualSourceManual.addEventListener("change", () => {
+      updateManualSourceControls();
+      setStatus("Styrkälla: manuellt värde. Ange procent och klicka på Sätt styrsignal.");
+    });
+
+    updateManualSourceControls();
+    updateManualSettingsVisibility();
     updateOnOffSettingsVisibility();
     updatePSettingsVisibility();
     updatePiSettingsVisibility();

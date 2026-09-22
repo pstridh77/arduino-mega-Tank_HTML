@@ -39,6 +39,7 @@ bool onOffPumpRunning = false;
 int currentMotorPwm = 0;
 float currentPContribution = 0.0F;
 float currentIContribution = 0.0F;
+int manualOverridePwm = -1;
 
 enum RegulationMode {
   MODE_OFF,
@@ -116,13 +117,18 @@ void updateManualMotorPwm() {
   currentPContribution = 0.0F;
   currentIContribution = 0.0F;
   const int potentiometerValue = analogRead(MOTOR_POTENTIOMETER_PIN);
-  const int requestedMotorPwm = potentiometerValue * 255L / ADC_MAX_VALUE;
+
+  const int requestedMotorPwm = manualOverridePwm >= 0
+    ? manualOverridePwm
+    : potentiometerValue * 255L / ADC_MAX_VALUE;
   const int motorPwm = writeMotorPwm(requestedMotorPwm);
 
   Serial.print("POT:");
   Serial.print(potentiometerValue);
   Serial.print('|');
-  Serial.println(motorPwm);
+  Serial.print(motorPwm);
+  Serial.print('|');
+  Serial.println(manualOverridePwm >= 0 ? "manual" : "pot");
 }
 
 void updateOnOffMotorPwm(float measuredLevel) {
@@ -230,6 +236,7 @@ void handleSerialLine(String line) {
     }
 
   resetPiIntegral();
+    manualOverridePwm = -1;
     writeMotorPwm(0);
     showRegulationStatus(desiredLevelMm - readMeasuredLevel());
     Serial.println("MODE:" + mode);
@@ -308,6 +315,31 @@ void handleSerialLine(String line) {
       Serial.println("MOTOR:" + String(safeMotorPwm));
     } else {
       Serial.println("MOTOR:ERROR");
+    }
+    return;
+  }
+
+  if (line.startsWith("MANUALPWM:")) {
+    const String valueText = line.substring(10);
+    const int pwmValue = valueText.toInt();
+
+    if (valueText.length() > 0 && pwmValue >= 0 && pwmValue <= 255 && String(pwmValue) == valueText) {
+      manualOverridePwm = pwmValue;
+      Serial.println("MANUALPWM:" + String(manualOverridePwm));
+    } else {
+      Serial.println("MANUALPWM:ERROR");
+    }
+    return;
+  }
+
+  if (line.startsWith("MANUALSOURCE:")) {
+    const String source = line.substring(13);
+
+    if (source == "pot") {
+      manualOverridePwm = -1;
+      Serial.println("MANUALSOURCE:pot");
+    } else {
+      Serial.println("MANUALSOURCE:ERROR");
     }
     return;
   }
