@@ -241,35 +241,24 @@
 
       <section class="panel-section" aria-labelledby="levelTitle">
         <h2 id="levelTitle">Nivåreglering</h2>
-        <div class="level-values">
-          <div class="level-reading measured">
-            <span>Uppmätt</span>
-            <div><output id="measuredLevel" aria-live="polite">--</output> mm</div>
-          </div>
-          <div class="level-reading desired">
-            <span>Önskad</span>
-            <div><output id="desiredLevelDisplay">--</output> mm</div>
-          </div>
-          <div class="level-reading error manual-error-display">
-            <span>Fel</span>
-            <div><output id="levelError" aria-live="polite">--</output> mm</div>
-          </div>
-        </div>
         <div class="chart-toolbar">
-          <div class="chart-legend" aria-label="Förklaring till grafen">
-            <span><i class="measured"></i>Uppmätt</span>
-            <span><i class="desired"></i>Önskad</span>
-          </div>
           <div class="chart-actions">
-            <button class="emergency-stop graph-stop-button" data-emergency-stop type="button" disabled>STOPP</button>
             <button id="toggleChartButton" class="chart-toggle" type="button" aria-pressed="false">Pausa graf</button>
+            <button class="emergency-stop graph-stop-button" data-emergency-stop type="button" disabled>STOPP</button>
           </div>
         </div>
         <div class="chart-layout">
           <div class="chart-card level-chart">
             <div class="chart-card-heading">
-              <span>Uppmätt / Önskad</span>
-              <span class="y-zoom-controls" aria-label="Zooma nivågrafens y-axel">
+              <fieldset class="chart-signal-select" aria-label="Välj signaler för graf 1">
+                <legend>Visa</legend>
+                <span class="chart-signal-options">
+                  <label><input type="checkbox" data-level-signal="measured" checked>Uppmätt</label>
+                  <label><input type="checkbox" data-level-signal="desired" checked>Önskad</label>
+                  <label><input type="checkbox" data-level-signal="motor">Motor %</label>
+                </span>
+              </fieldset>
+              <span id="levelZoomControls" class="y-zoom-controls" aria-label="Zooma nivågrafens y-axel">
                 <button id="levelZoomOut" type="button" aria-label="Zooma ut nivågrafen">-</button>
                 <output id="levelZoomValue">+/-250 mm</output>
                 <button id="levelZoomIn" type="button" aria-label="Zooma in nivågrafen">+</button>
@@ -279,13 +268,19 @@
           </div>
           <div id="errorPanel" class="chart-card error-panel" aria-label="Reglerfel">
             <div class="chart-card-heading">
-              <span id="errorChartTitle">Fel</span>
+              <label class="chart-signal-select" for="errorSignalSelect">
+                Visa
+                <select id="errorSignalSelect" aria-label="Välj signal för graf 2">
+                  <option value="error" selected>Fel</option>
+                  <option value="motor">Motor %</option>
+                  <option value="control">Styrsignal (PWM)</option>
+                </select>
+              </label>
               <span id="errorZoomControls" class="y-zoom-controls" aria-label="Zooma felgrafens y-axel">
                 <button id="errorZoomOut" type="button" aria-label="Zooma ut felgrafen">-</button>
                 <output id="errorZoomValue">+/-250 mm</output>
                 <button id="errorZoomIn" type="button" aria-label="Zooma in felgrafen">+</button>
               </span>
-              <output id="errorChartManualRange" class="y-zoom-controls" hidden>0-100 %</output>
             </div>
             <canvas id="errorChart" class="error-chart" role="img" aria-label="Reglerfel under de senaste 60 sekunderna"></canvas>
           </div>
@@ -311,9 +306,6 @@
     const piSettings = document.querySelector("#piSettings");
     const piIntegralGain = document.querySelector("#piIntegralGain");
     const sendPiSettingsButton = document.querySelector("#sendPiSettingsButton");
-    const measuredLevel = document.querySelector("#measuredLevel");
-    const desiredLevelDisplay = document.querySelector("#desiredLevelDisplay");
-    const levelError = document.querySelector("#levelError");
     const diagramDesired = document.querySelector("#diagramDesired");
     const diagramError = document.querySelector("#diagramError");
     const diagramRegulator = document.querySelector("#diagramRegulator");
@@ -371,15 +363,16 @@
     const errorChart = document.querySelector("#errorChart");
     const errorChartContext = errorChart.getContext("2d");
     const errorPanel = document.querySelector("#errorPanel");
-    const errorChartTitle = document.querySelector("#errorChartTitle");
+    const levelSignalInputs = document.querySelectorAll("[data-level-signal]");
+    const errorSignalSelect = document.querySelector("#errorSignalSelect");
     const errorZoomControls = document.querySelector("#errorZoomControls");
-    const errorChartManualRange = document.querySelector("#errorChartManualRange");
     const errorZoomOut = document.querySelector("#errorZoomOut");
     const errorZoomIn = document.querySelector("#errorZoomIn");
     const errorZoomValue = document.querySelector("#errorZoomValue");
     const levelZoomOut = document.querySelector("#levelZoomOut");
     const levelZoomIn = document.querySelector("#levelZoomIn");
     const levelZoomValue = document.querySelector("#levelZoomValue");
+    const levelZoomControls = document.querySelector("#levelZoomControls");
     const toggleChartButton = document.querySelector("#toggleChartButton");
     const statusText = document.querySelector("#status");
 
@@ -441,25 +434,43 @@
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
       const now = chartPaused ? pausedChartTime : performance.now();
+      const selectedLevelSignals = new Set(
+        [...levelSignalInputs]
+          .filter((input) => input.checked)
+          .map((input) => input.dataset.levelSignal),
+      );
+      const hasLevelSignals = selectedLevelSignals.has("measured") || selectedLevelSignals.has("desired");
+      const hasMotorSignal = selectedLevelSignals.has("motor");
       const levelCenter = latestDesired ?? Number(desiredLevel.value);
-      const levelMinimum = Math.max(0, levelCenter - levelChartHalfRange);
-      const levelMaximum = Math.min(chartMaxLevel, levelCenter + levelChartHalfRange);
+      const levelMinimum = hasLevelSignals ? Math.max(0, levelCenter - levelChartHalfRange) : 0;
+      const levelMaximum = hasLevelSignals ? Math.min(chartMaxLevel, levelCenter + levelChartHalfRange) : 100;
       const levelTickStep = levelChartHalfRange <= 100 ? 50 : 100;
 
       levelChartContext.font = "11px Segoe UI, sans-serif";
       levelChartContext.lineWidth = 1;
       levelChartContext.textBaseline = "middle";
 
-      for (let level = Math.ceil(levelMinimum / levelTickStep) * levelTickStep; level <= levelMaximum; level += levelTickStep) {
-        const y = plot.bottom - ((level - levelMinimum) / (levelMaximum - levelMinimum)) * plotHeight;
-        levelChartContext.strokeStyle = "#ded5c3";
-        levelChartContext.beginPath();
-        levelChartContext.moveTo(plot.left, y);
-        levelChartContext.lineTo(plot.right, y);
-        levelChartContext.stroke();
-        levelChartContext.fillStyle = "#6b665b";
-        levelChartContext.textAlign = "right";
-        levelChartContext.fillText(String(level), plot.left - 7, y);
+      if (hasLevelSignals) {
+        for (let level = Math.ceil(levelMinimum / levelTickStep) * levelTickStep; level <= levelMaximum; level += levelTickStep) {
+          const y = plot.bottom - ((level - levelMinimum) / (levelMaximum - levelMinimum)) * plotHeight;
+          levelChartContext.strokeStyle = "#ded5c3";
+          levelChartContext.beginPath();
+          levelChartContext.moveTo(plot.left, y);
+          levelChartContext.lineTo(plot.right, y);
+          levelChartContext.stroke();
+          levelChartContext.fillStyle = "#6b665b";
+          levelChartContext.textAlign = "right";
+          levelChartContext.fillText(String(level), plot.left - 7, y);
+        }
+      }
+
+      if (hasMotorSignal) {
+        levelChartContext.textAlign = "left";
+        levelChartContext.fillStyle = "#b4492f";
+        for (let percent = 0; percent <= 100; percent += 25) {
+          const y = plot.bottom - (percent / 100) * plotHeight;
+          levelChartContext.fillText(`${percent}%`, plot.right + 7, y);
+        }
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -505,8 +516,15 @@
           levelChartContext.stroke();
         }
 
-        drawSeries("measured", "#24745f", levelMinimum, levelMaximum);
-        drawSeries("desired", "#2463a0", levelMinimum, levelMaximum);
+        if (selectedLevelSignals.has("measured")) {
+          drawSeries("measured", "#24745f", levelMinimum, levelMaximum);
+        }
+        if (selectedLevelSignals.has("desired")) {
+          drawSeries("desired", "#2463a0", levelMinimum, levelMaximum);
+        }
+        if (hasMotorSignal) {
+          drawSeries("motorPercent", "#b4492f", 0, 100);
+        }
         levelChartContext.restore();
       }
 
@@ -533,37 +551,26 @@
       const plot = { left: 42, top: 10, right: width - 42, bottom: height - 24 };
       const plotWidth = plot.right - plot.left;
       const plotHeight = plot.bottom - plot.top;
-      const manualChart = controlMode.value === "manual";
+      const errorSignal = errorSignalSelect.value;
+      const errorChartMode = errorSignal === "error";
+      const chartMinimum = errorChartMode ? -errorChartLimit : 0;
+      const chartMaximum = errorChartMode ? errorChartLimit : errorSignal === "control" ? 255 : 100;
+      const chartTickStep = errorChartMode ? 100 : errorSignal === "control" ? 50 : 25;
 
       errorChartContext.font = "11px Segoe UI, sans-serif";
       errorChartContext.textBaseline = "middle";
       errorChartContext.textAlign = "right";
 
-      if (manualChart) {
-        for (let value = 0; value <= 100; value += 25) {
-          const y = plot.bottom - (value / 100) * plotHeight;
-          errorChartContext.strokeStyle = "#ded5c3";
-          errorChartContext.beginPath();
-          errorChartContext.moveTo(plot.left, y);
-          errorChartContext.lineTo(plot.right, y);
-          errorChartContext.stroke();
-          errorChartContext.fillStyle = "#6b665b";
-          errorChartContext.fillText(String(value), plot.left - 7, y);
-        }
-      } else {
-        const errorLimit = errorChartLimit;
-        const firstErrorGridValue = Math.ceil(-errorLimit / 100) * 100;
-
-        for (let value = firstErrorGridValue; value <= errorLimit; value += 100) {
-          const y = plot.bottom - ((value + errorLimit) / (errorLimit * 2)) * plotHeight;
-          errorChartContext.strokeStyle = value === 0 ? "#b9a999" : "#ded5c3";
-          errorChartContext.beginPath();
-          errorChartContext.moveTo(plot.left, y);
-          errorChartContext.lineTo(plot.right, y);
-          errorChartContext.stroke();
-          errorChartContext.fillStyle = "#6b665b";
-          errorChartContext.fillText(String(value), plot.left - 7, y);
-        }
+      const firstGridValue = Math.ceil(chartMinimum / chartTickStep) * chartTickStep;
+      for (let value = firstGridValue; value <= chartMaximum; value += chartTickStep) {
+        const y = plot.bottom - ((value - chartMinimum) / (chartMaximum - chartMinimum)) * plotHeight;
+        errorChartContext.strokeStyle = errorChartMode && value === 0 ? "#b9a999" : "#ded5c3";
+        errorChartContext.beginPath();
+        errorChartContext.moveTo(plot.left, y);
+        errorChartContext.lineTo(plot.right, y);
+        errorChartContext.stroke();
+        errorChartContext.fillStyle = "#6b665b";
+        errorChartContext.fillText(String(value), plot.left - 7, y);
       }
 
       for (let secondsAgo = 0; secondsAgo <= 60; secondsAgo += 10) {
@@ -589,7 +596,7 @@
       errorChartContext.beginPath();
       errorChartContext.rect(plot.left, plot.top, plotWidth, plotHeight);
       errorChartContext.clip();
-      errorChartContext.strokeStyle = manualChart ? "#24745f" : "#b4492f";
+      errorChartContext.strokeStyle = errorSignal === "error" ? "#b4492f" : errorSignal === "motor" ? "#24745f" : "#2463a0";
       errorChartContext.lineWidth = 2;
       errorChartContext.lineJoin = "round";
       errorChartContext.beginPath();
@@ -598,14 +605,13 @@
         const x = plot.right - ((now - sample.time) / chartTimeSpanMs) * plotWidth;
         let y;
 
-        if (manualChart) {
-          const boundedMotorPercent = Math.min(100, Math.max(0, sample.motorPercent));
-          y = plot.bottom - (boundedMotorPercent / 100) * plotHeight;
-        } else {
-          const errorLimit = errorChartLimit;
-          const boundedError = Math.min(errorLimit, Math.max(-errorLimit, sample.error));
-          y = plot.bottom - ((boundedError + errorLimit) / (errorLimit * 2)) * plotHeight;
-        }
+        const sampleValue = errorSignal === "error"
+          ? sample.error
+          : errorSignal === "motor"
+            ? sample.motorPercent
+            : sample.controlSignal;
+        const boundedValue = Math.min(chartMaximum, Math.max(chartMinimum, sampleValue));
+        y = plot.bottom - ((boundedValue - chartMinimum) / (chartMaximum - chartMinimum)) * plotHeight;
 
         if (index === 0) {
           errorChartContext.moveTo(x, y);
@@ -700,9 +706,6 @@
       latestProcessLevel = measured;
       latestDesired = desired;
       latestError = error;
-        measuredLevel.value = measured.toFixed(1);
-        desiredLevelDisplay.value = desired.toFixed(1);
-        levelError.value = error.toFixed(1);
       diagramDesired.textContent = `${desired.toFixed(1)} mm`;
       diagramError.textContent = `${error.toFixed(1)} mm`;
       diagramOutput.textContent = `${measured.toFixed(1)} mm`;
@@ -716,7 +719,14 @@
         }
 
         const now = performance.now();
-        levelHistory.push({ time: now, measured, desired, error, motorPercent: latestOutputPwm / 255 * 100 });
+        levelHistory.push({
+          time: now,
+          measured,
+          desired,
+          error,
+          motorPercent: latestOutputPwm / 255 * 100,
+          controlSignal: latestOutputPwm,
+        });
 
         while (levelHistory.length > 0 && levelHistory[0].time < now - chartTimeSpanMs) {
           levelHistory.shift();
@@ -843,7 +853,6 @@
         return;
       }
 
-      desiredLevelDisplay.value = Number(desiredLevel.value).toFixed(1);
       diagramDesired.textContent = `${Number(desiredLevel.value).toFixed(1)} mm`;
       latestDesired = Number(desiredLevel.value);
       updateProcessTank(latestProcessLevel ?? 0, latestDesired);
@@ -921,11 +930,15 @@
     }
 
     function updateErrorPanelMode() {
-      const manualChart = controlMode.value === "manual";
-      errorPanel.setAttribute("aria-label", manualChart ? "Motorstyrsignal" : "Reglerfel");
-      errorChartTitle.textContent = manualChart ? "Motor %" : "Fel";
-      errorZoomControls.hidden = manualChart;
-      errorChartManualRange.hidden = !manualChart;
+      const errorSignal = errorSignalSelect.value;
+      const signalLabels = {
+        error: "Reglerfel",
+        motor: "Motorprocent",
+        control: "Styrsignal i PWM",
+      };
+      errorPanel.setAttribute("aria-label", signalLabels[errorSignal]);
+      errorChart.setAttribute("aria-label", `${signalLabels[errorSignal]} under de senaste 60 sekunderna`);
+      errorZoomControls.hidden = errorSignal !== "error";
     }
 
     async function sendPiSettings() {
@@ -1255,6 +1268,28 @@
     updatePiSettingsVisibility();
     updateRegulatorSettingsVisibility();
     updateDiagramFeedbackVisibility();
+
+    function updateChartSignalLabels() {
+      const selectedLevelSignals = [...levelSignalInputs]
+        .filter((input) => input.checked)
+        .map((input) => input.dataset.levelSignal);
+      const hasLevelSignals = selectedLevelSignals.includes("measured") || selectedLevelSignals.includes("desired");
+      levelChart.setAttribute(
+        "aria-label",
+        selectedLevelSignals.length === 0
+          ? "Ingen signal vald"
+          : `${selectedLevelSignals.map((signal) => signal === "motor" ? "motorprocent" : signal === "measured" ? "uppmätt nivå" : "önskad nivå").join(", ")} under de senaste 60 sekunderna`,
+      );
+      levelZoomValue.textContent = hasLevelSignals ? `+/-${levelChartHalfRange} mm` : "Motor %";
+      levelZoomControls.hidden = !hasLevelSignals;
+      updateErrorPanelMode();
+    }
+
+    levelSignalInputs.forEach((input) => {
+      input.addEventListener("change", updateChartSignalLabels);
+    });
+    errorSignalSelect.addEventListener("change", updateChartSignalLabels);
+    updateChartSignalLabels();
 
     toggleChartButton.addEventListener("click", () => {
       chartPaused = !chartPaused;

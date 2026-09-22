@@ -446,45 +446,6 @@ input:disabled {
   color: var(--ink);
 }
 
-.level-values {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.level-reading {
-  font-variant-numeric: tabular-nums;
-}
-
-.level-reading > span {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.level-reading div {
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.level-reading output {
-  font-size: 1.15rem;
-}
-
-.level-reading.measured div {
-  color: #24745f;
-}
-
-.level-reading.desired div {
-  color: #2463a0;
-}
-
-.level-reading.error div {
-  color: #b4492f;
-}
-
 .setpoint-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -549,8 +510,8 @@ input:disabled {
   position: absolute;
   top: 16px;
   right: 16px;
-  display: grid;
-  justify-items: end;
+  display: flex;
+  align-items: center;
   gap: 6px;
 }
 
@@ -587,6 +548,55 @@ input:disabled {
   justify-content: space-between;
   gap: 8px;
   min-height: 1.35rem;
+}
+
+.chart-signal-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+fieldset.chart-signal-select {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.chart-signal-select legend {
+  float: left;
+  margin-right: 6px;
+}
+
+.chart-signal-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.chart-signal-select label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.chart-signal-select input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.chart-signal-select select {
+  width: auto;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
 }
 
 .y-zoom-controls {
