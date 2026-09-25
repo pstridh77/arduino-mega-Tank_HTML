@@ -469,7 +469,18 @@
       );
       const hasLevelSignals = selectedLevelSignals.has("measured") || selectedLevelSignals.has("desired");
       const hasMotorSignal = selectedLevelSignals.has("motor");
-      const levelCenter = latestDesired ?? Number(desiredLevel.value);
+      const visibleLevelValues = [];
+      const desiredValue = latestDesired ?? Number(desiredLevel.value);
+      const measuredValue = latestMeasured;
+      if (selectedLevelSignals.has("measured") && Number.isFinite(measuredValue)) {
+        visibleLevelValues.push(measuredValue);
+      }
+      if (selectedLevelSignals.has("desired") && Number.isFinite(desiredValue)) {
+        visibleLevelValues.push(desiredValue);
+      }
+      const levelCenter = visibleLevelValues.length > 0
+        ? visibleLevelValues.reduce((sum, value) => sum + value, 0) / visibleLevelValues.length
+        : desiredValue;
       const levelMinimum = hasLevelSignals ? Math.max(0, levelCenter - levelChartHalfRange) : 0;
       const levelMaximum = hasLevelSignals ? Math.min(chartMaxLevel, levelCenter + levelChartHalfRange) : 100;
       const levelTickStep = levelChartHalfRange <= 100 ? 50 : 100;
