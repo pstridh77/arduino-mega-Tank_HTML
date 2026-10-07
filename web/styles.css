@@ -271,10 +271,68 @@ dialog::backdrop {
   font-size: 12px;
 }
 
-#connectButton,
+.connection-actions,
 .status,
 .panel-section[aria-labelledby="levelTitle"] {
   grid-column: 1 / -1;
+}
+
+.connection-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.connection-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fffdf8;
+}
+
+.connection-mode label {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.connection-mode input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+
+.connection-mode label span {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+
+.connection-mode input:checked + span {
+  background: var(--accent);
+  color: white;
+}
+
+.connection-mode input:focus-visible + span {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.connection-mode input:disabled + span {
+  opacity: 0.55;
 }
 
 button {
